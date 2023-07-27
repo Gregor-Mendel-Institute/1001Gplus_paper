@@ -1,4 +1,4 @@
-# Stat about paction genomes:
+# Statistics about PacBio genomes:
 
 * Lengths
 * Centromeres
