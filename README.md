@@ -9,6 +9,8 @@ If you want to create an analysis folder, you can use the script utils/create_di
 
 The structure of the folder will be automatically created.
 
-
+## Important comments to share
+* Reconstructed 22001 is called 220011
+* ..
 
 
