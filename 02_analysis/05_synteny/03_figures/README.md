@@ -1,8 +1,9 @@
 # Figures, syntheny in the alignments
 
 
+<img src="png_fig_synteny_alignment_chr1.png" width="400">
+<img src="png_fig_synteny_alignment_chr2.png" width="400">
+<img src="png_fig_synteny_alignment_chr3.png" width="400">
+<img src="png_fig_synteny_alignment_chr4.png" width="400">
+<img src="png_fig_synteny_alignment_chr5.png" width="400">
 
-
-
-<object data="fhttps://github.com/Gregor-Mendel-Institute/1001Gplus_paper/blob/main/02_analysis/05_synteny/03_figures/fig_synteny_alignment_chr1.pdf" type="application/pdf" width="100%"> 
-</object>
