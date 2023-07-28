@@ -280,7 +280,7 @@ getBlocksBwNeiAccs <- function(idx.break, i.chr, accessions, i.order){
 
 splitBlocksByGrid <- function(df.blocks, wnd.size = 1000000){
   
-  
+  # message(paste('window size', wnd.size))
   n.bl = nrow(df.blocks)
   for(irow in 1:n.bl){
     d = df.blocks$pan.e[irow] - df.blocks$pan.b[irow] 
@@ -418,7 +418,7 @@ ggSynteny <- function(idx.break, i.chr, accessions, i.order, file.cen.pos=NULL, 
   # Blocks by grid
   # wnd.size = 100000
   
-  df.plot = splitBlocksByGrid(df.blocks, wnd.size = 1000000)
+  df.plot = splitBlocksByGrid(df.blocks, wnd.size = wnd.size)
   
   # Define color pallete
   gr.col = getColorPallete(df.plot)

@@ -87,14 +87,14 @@ for(i.chr in 1:5){
 
 # Save all chromosome figures
 ```{r}
-
+wnd.size = 100000
 for(i.chr in 1:n.chr){
   message(paste('Chromosome', i.chr))
   i.order = chr.order[[i.chr]]
   idx.break$acc <- factor(idx.break$acc, levels = accessions[i.order])
 
   p = ggSynteny(idx.break, i.chr, accessions, i.order, 
-                file.cen.pos=file.cen.pos, file.acc.len=file.acc.len, wnd.size = 1000000)
+                file.cen.pos=file.cen.pos, file.acc.len=file.acc.len, wnd.size=wnd.size)
   
   pdf(paste(path.figures, 'fig_synteny_alignment_chr',i.chr,'.pdf', sep = ''), width = 7, height = 5)
   print(p)     # Plot 1 --> in the first page of PDF
@@ -105,16 +105,16 @@ for(i.chr in 1:n.chr){
 
 
 ```
-# Vidualise one chromosome
+# Visualise one chromosome
 ```{r}
 i.order = chr.order[[i.chr]]
 idx.break$acc <- factor(idx.break$acc, levels = accessions[i.order])
 
 p = ggSynteny(idx.break, i.chr, accessions, i.order, 
-              file.cen.pos=file.cen.pos, file.acc.len=file.acc.len, wnd.size = 1000000)
+              file.cen.pos=file.cen.pos, file.acc.len=file.acc.len, wnd.size = 100000)
 p
 
-p.init = ggSynteny(idx.break, i.chr, accessions, i.order, wnd.size = 1000000)
+p.init = ggSynteny(idx.break, i.chr, accessions, i.order, wnd.size = 100000)
 p.init
 
 ```
