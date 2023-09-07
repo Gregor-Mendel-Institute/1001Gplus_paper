@@ -1,0 +1,113 @@
+---
+title: "Visualisation of Sebastian's data"
+output: html_notebook
+---
+
+# Setup
+```{r}
+library(cultevo)  #hammingdists
+library(ggplot2)
+library(ggtree)
+# library('ggmsa')
+library(gridExtra)
+library(egg)
+
+path.base = '../../../'
+
+path.data = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
+path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
+
+path.stat = paste(path.base, '01_data_common/04_stat/', sep = '')
+file.cen.pos = paste(path.stat, 'cen_pos_fernando.txt', sep = '')
+cen.breaks = read.table(file.cen.pos, stringsAsFactors = F, header = 1)
+cen.breaks$acc.chr = paste(cen.breaks$Accession.x, cen.breaks$Chromosome.x, sep = '_')
+cen.breaks$chr = as.numeric(gsub('Chr', '', cen.breaks$Chromosome.x))
+
+wnd.size = 300000
+min.value = 15
+```
+
+
+```{r}
+
+n.new = 1  # number of "gap"-windows
+
+for (i.chr in 1:5){
+  
+  file = paste(path.data, 'bubbles_chr',i.chr,'.300kb.tsv', sep = '')
+  
+  cen.breaks.chr = cen.breaks[cen.breaks$chr == i.chr,]
+  
+  bubbles = read.table(file, header = 1, check.names = F, stringsAsFactors = F, row.names = 2)
+  bubbles = bubbles[,-1]
+  rownames(bubbles) <- gsub('22001', '220011', rownames(bubbles))
+  rownames(bubbles) <- gsub('_mod2', '', rownames(bubbles))
+  rownames(bubbles) <- gsub('TAIR10', '0', rownames(bubbles))
+  bubbles[bubbles < min.value] = min.value
+  
+  pos = (1:ncol(bubbles) - 1) * wnd.size
+  
+  
+  bubbles = cbind(bubbles, matrix(NaN, nrow = nrow(bubbles), ncol = n.new))
+  n = ncol(bubbles)
+  
+  for(i in 1:nrow(bubbles)){
+    b1 = max(which(pos <= cen.breaks.chr$End[cen.breaks.chr$acc.chr == rownames(bubbles)[i]])) + 1
+    e1 = max(which(!is.na(bubbles[i,])))
+    shift = n - e1
+    bubbles[i, (b1:e1) + shift] = bubbles[i, (b1:e1)]
+    bubbles[i, b1:(b1+shift-1)] = NaN
+  }
+  
+  
+  df = reshape2::melt(cbind(RowName = rownames(bubbles), bubbles), id.vars = "RowName")
+  df$RowName = gsub(paste('_Chr', i.chr, sep = ''), '', df$RowName)
+  
+  my_colors <- rev(c("#F6F2D4", "#95D1CC","#5584AC", "#22577E", '#213555'))
+  p = ggplot(data = df, aes(x = variable, y = RowName, fill = value)) +
+    geom_tile() + 
+    # scale_fill_viridis_c(na.value = "white", option = "magma", direction = -1) + 
+    scale_fill_gradientn(colors = my_colors, na.value = "white",
+                         guide = guide_colourbar(direction = "horizontal", 
+                                                 barheight = 0.7, barwidth = 10,
+                                                 label.size = 0.5,
+                                                 title.size = 0.5,
+                                                 title.position = "left",
+                                                 title.hjust = 0.5,
+                                                 title.vjust = 1,
+                                                 label.position = "bottom"),
+                         breaks = c(15, 20, 25, 28),
+                         labels = c('<=15', 20, 25, 28)) +
+    theme_minimal() +
+    labs(x = NULL, y = NULL, fill = "Synteny level") +
+    # labs(x = 'Chromosome position', y = NULL, fill = "Value") +
+  theme(
+      axis.text.x = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      legend.position = c(1, 0.03),   # располагаем легенду снизу
+      legend.justification = "right", # выравниваем по правому краю
+    ) + 
+    annotate("text", x = 0, y = -3, label = "Positions of chromosomal arms [->      <-] \n \n  ", hjust = 0, vjust = 0.3) + coord_cartesian(clip = "off")
+  # +
+  #   annotate("text", x = Inf, y = -3, label = "<- Right positions \n \n  ", hjust = 1, vjust = 0.3) + coord_cartesian(clip = "off")
+  # 
+  
+  p 
+  
+  
+  pdf(paste(path.figures, 'fig_bubbles_synteny_chr',i.chr,'.pdf', sep = ''), width = 7, height = 4.5)
+  print(p)     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+}
+
+
+
+```
+
+
+
+
+
+

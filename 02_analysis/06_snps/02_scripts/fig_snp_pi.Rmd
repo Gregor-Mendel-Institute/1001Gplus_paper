@@ -1,0 +1,72 @@
+---
+title: "Visualisation of Lisa's SNP PI diversity"
+output: html_notebook
+---
+
+# Setup
+```{r}
+library(cultevo)  #hammingdists
+library(ggplot2)
+library(ggtree)
+# library('ggmsa')
+library(gridExtra)
+library(egg)
+
+path.base = '../../../'
+
+path.data = paste(path.base, '02_analysis/06_snps/01_data/', sep = '')
+path.figures = paste(path.base, '02_analysis/06_snps/03_figures/', sep = '')
+
+path.stat = paste(path.base, '01_data_common/04_stat/', sep = '')
+file.cen.pos = paste(path.stat, 'cen_pos_fernando.txt', sep = '')
+cen.breaks = read.table(file.cen.pos, stringsAsFactors = F, header = 1)
+cen.breaks$acc.chr = paste(cen.breaks$Accession.x, cen.breaks$Chromosome.x, sep = '_')
+cen.breaks$chr = as.numeric(gsub('Chr', '', cen.breaks$Chromosome.x))
+cen.breaks = cen.breaks[cen.breaks$Accession.x == '0',]
+
+cep.pos = read.table(paste(path.data,'centr_bound.txt', sep = ''), header = 1)
+
+wnd.size = 300000
+min.value = 15
+chr.color = '#176B87'
+```
+
+
+
+```{r}
+
+file = paste(path.data, 'athal_genic_nongenic_all_pi_300kb_pi.txt', sep = '')
+pi.all = read.table(file, stringsAsFactors = F, header = 1)
+
+for(i.chr in 1:5){
+# cen.breaks.chr = cen.breaks[cen.breaks$chr == i.chr,]
+  pi.chr = pi.all[pi.all$chromosome == paste('Chr', i.chr, sep = ''),]
+  cep.pos.chr = cep.pos[cep.pos$chromosome == paste('Chr', i.chr, sep = ''),]
+  
+  p = ggplot(pi.chr, aes(x = window_pos_1, y = avg_pi)) + 
+    annotate(geom = "rect",xmin = cep.pos.chr$start2, xmax = cep.pos.chr$stop2, ymin = -Inf, ymax = Inf,
+           fill = chr.color, alpha = 0.2) +
+    annotate(geom = "rect",xmin = cep.pos.chr$start3, xmax = cep.pos.chr$stop3, ymin = -Inf, ymax = Inf,
+           fill = chr.color, alpha = 0.2) +
+    annotate(geom = "rect",xmin = cep.pos.chr$start, xmax = cep.pos.chr$stop, ymin = -Inf, ymax = Inf,
+           fill = chr.color, alpha = 0.5) +
+    geom_line(size = 1) +
+    # geom_point(size = 1) +
+    theme_minimal() + 
+    ylab(expression(pi)) + xlab('TAIR10 Cromosome position') +
+    scale_x_continuous(expand = c(0, 0), breaks = seq(0,30,5)*1000000, labels = paste(seq(0,30,5), 'M', sep = '')) +
+    scale_y_continuous(expand = c(0.05, 0)) +
+    theme( panel.border = element_rect(colour = "grey70", fill=NA, size=1),
+           panel.grid.minor = element_blank()) 
+  p 
+  
+  pdf(paste(path.figures, 'fig_pi_diversity_chr',i.chr,'.pdf', sep = ''), width = 7, height = 1.2)
+  print(p)     # Plot 1 --> in the first page of PDF
+  dev.off()
+  
+}
+
+
+
+```
+
