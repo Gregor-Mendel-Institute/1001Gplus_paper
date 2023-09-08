@@ -3,6 +3,8 @@ title: "Graph of TEs"
 output: html_notebook
 ---
 
+This file contains a basic pipeline for creating a graph of nestedness 
+taking into account counts of the "same" sequences (sim.cutoff).
 
 # Setup
 ```{r, message=FALSE}
@@ -27,7 +29,6 @@ path.base = '../../../'
 path.work = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
 
 
-# sim.cutoff = 0.9
 sim.cutoff = 0.85
 
 ```
