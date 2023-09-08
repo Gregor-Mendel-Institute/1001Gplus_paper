@@ -49,6 +49,7 @@ bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
 
 res.nest = findNestedness(bl.res, use.strand = F)
 
+message('be careful with extracting sequence lengths, it a positionsl information in their names')
 res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][5]))
   
 res.nest$len1 = res.nest.len[res.nest$V1]
