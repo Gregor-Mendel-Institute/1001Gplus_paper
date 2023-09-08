@@ -1,0 +1,163 @@
+---
+title: "Graph of TEs"
+output: html_notebook
+---
+
+
+# Setup
+```{r, message=FALSE}
+# library(ggplot2)
+# library(reshape2)
+library(viridis)
+library(colorRamps)
+library(gridExtra)
+library(ggplot2)
+library('igraph')
+library(ggnet)
+library(network)
+library(khroma)
+library(dplyr)
+
+source('similarity.R')
+
+sunset <- colour("sunset")
+discrete_rainbow <- colour("discrete rainbow")
+
+path.base = '../../../'
+path.work = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
+
+
+# sim.cutoff = 0.9
+sim.cutoff = 0.85
+
+```
+
+
+# Find nestedness
+```{r}
+
+# Load similarity function
+
+bl.file = paste(path.work,'new_te_on_te.fasta',sep = '')
+
+bl.res = read.table(bl.file)
+bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+
+bl.res.init = bl.res
+bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+
+res.nest = findNestedness(bl.res, use.strand = F)
+
+res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][5]))
+  
+res.nest$len1 = res.nest.len[res.nest$V1]
+res.nest$len8 = res.nest.len[res.nest$V8]
+res.nest$p1 = res.nest$C1 / res.nest$len1
+res.nest$p8 = res.nest$C8 / res.nest$len8
+
+res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
+                          (res.nest$p8 >= sim.cutoff),]
+```
+
+
+## Creating the graph
+```{r}
+# all edges
+idx = res.nest$p1 >= sim.cutoff
+edges = cbind(res.nest$V1[idx], res.nest$V8[idx])
+idx = res.nest$p8 >= sim.cutoff
+edges = rbind(edges, cbind(res.nest$V8[idx], res.nest$V1[idx]))
+te.enges.names = unique(c(edges[,1], edges[,2]))
+
+# nodes
+idx = (res.nest$p1 >= sim.cutoff) & (res.nest$p8 >= sim.cutoff)
+te.nodes = cbind(res.nest$V1[idx], res.nest$V8[idx])
+
+te.rest = setdiff(te.enges.names, c(te.nodes[,1], te.nodes[,2]))
+
+te.nodes.graph <- igraph::make_graph(t(te.nodes), directed = T)
+te.nodes.graph <- igraph::simplify(te.nodes.graph)
+te.nodes.comp <- igraph::components(te.nodes.graph)
+
+nodes = data.frame(node = paste('N', te.nodes.comp$membership, sep = ''), 
+                   te = names(te.nodes.comp$membership))
+nodes.rest = data.frame(node = paste('R', (1:length(te.rest)), sep = ''), te = te.rest)
+nodes = rbind(nodes, nodes.rest)
+
+rownames(nodes) = nodes$te
+
+
+nodes.cnt = data.frame(cnt = c(table(nodes$node)))
+nodes.cnt$node = rownames(nodes.cnt)
+
+
+# Redefine edges but with node names
+idx.endes = (edges[,1] %in% nodes$te) & (edges[,2] %in% nodes$te)
+b.graph = cbind(nodes[edges[idx.endes,1], 'node'],nodes[edges[idx.endes,2], 'node'])
+b.graph = unique(b.graph)
+# b.graph = b.graph[b.graph[,1] != b.graph[,2],]
+b.graph.uni = b.graph[b.graph[,1] == b.graph[,2],]
+b.graph = b.graph[b.graph[,1] != b.graph[,2],]
+
+length(unique(c(b.graph[,1], b.graph[,2])))
+
+# reduce indirect arrows
+idx.remove = c()
+for(i.edge in 1:nrow(b.graph)){
+  if(i.edge %% 1000 == 0) print(i.edge)
+  tmp.to = b.graph[b.graph[,1] == b.graph[i.edge,1],2]
+  tmp.from = b.graph[b.graph[,2] == b.graph[i.edge,2],1]
+  if(length(intersect(tmp.to, tmp.from)) > 0) idx.remove = c(idx.remove, i.edge)
+}
+idx.remove = unique(idx.remove)
+b.graph = b.graph[-idx.remove,]
+# b.graph = rbind(b.graph, b.graph.uni)
+```
+
+
+# Plot graph
+## Preparation
+```{r}
+g.nodes.cnt = nodes.cnt$cnt
+names(g.nodes.cnt) = nodes.cnt$node
+
+b.graph.init = b.graph
+
+g.part <- network(b.graph, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+```
+
+## Plot
+```{r}
+p <- ggnet2(g.part, label = F, edge.color = "black",
+            node.size = g.nodes.cnt[b.graph.names],
+            color = '#468B97'
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
+p
+
+
+```
+
+# Output
+```{r}
+
+# nodes:
+head(nodes)
+
+# edges:
+head(b.graph)
+
+# Connected components
+final.graph <- igraph::make_graph(t(b.graph), directed = T)
+final.graph <- igraph::simplify(final.graph)
+final.graph.comp <- igraph::components(final.graph)
+
+# memnership
+head(final.graph.comp$membership, 100)
+
+```
+
+

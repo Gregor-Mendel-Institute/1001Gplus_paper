@@ -16,6 +16,7 @@ path.base = '../../../'
 path.work = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', sep = '')
 path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
 path.genes = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes/', sep = '')
+path.data.snps = paste(path.base, '02_analysis/06_snps/01_data/', sep = '')
 
 # path.work = '/Volumes/Samsung_T5/vienn/work_sv/'
 # path.figures = paste(path.work, 'figures/', sep = '')
@@ -39,6 +40,22 @@ pokaz <- function(...) {
 # Reading
 ```{r}
 sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+
+# Rename groups
+lev.replace = c('[1,10]', '(10,15]')
+lev.new = '[1,15]'
+
+s.levels = as.character(levels(sv.se$len.gr))
+s.levels = s.levels[!(s.levels %in% lev.replace)]
+s.levels = c(lev.new, s.levels)
+s.levels = gsub("e\\+03", "k", s.levels)
+
+sv.se$len.gr = as.character(sv.se$len.gr)
+sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
+sv.se$len.gr = gsub("e\\+03", "k", sv.se$len.gr)
+sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
+
+
 sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
 
 sv.pos.beg = read.table(paste(path.work, 'svs_all_beg_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
@@ -47,13 +64,17 @@ sv.pos.end = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), s
 # sv.se = sv.se[sv.se$gr %in% sv.my.seb$gr,]
 ```
 
-
-
 ## Stat
 ```{r}
 pokaz('Number of all SVs', nrow(sv.all))
 pokaz('Number of SVs len >= 15', sum(sv.all$len >= 15))
 pokaz('me-se', paste0(c(table(sv.all$single[sv.all$len >= 15])), collapse = ' '))
+```
+
+### Additional me-SV categories
+```{r}
+
+
 ```
 
 
@@ -118,12 +139,17 @@ dev.off()
 
 # Correspondence between pangenome and accession coordinates
 ```{r}
-i.chr = 1
+i.chr = 5
 i.acc = 1
 df = data.frame(pangenome = sv.all$beg[sv.all$chr == i.chr], 
                 accession = sv.pos.beg[sv.all$chr == i.chr, i.acc])
 df = df[df[,2] != 0,]
 # plot(df[,1], df[,2])
+
+# Add regions of annotation
+
+cep.pos = read.table(paste(path.data.snps,'centr_bound.txt', sep = ''), header = 1)
+cep.pos.chr = cep.pos[cep.pos$chromosome == paste('Chr', i.chr, sep = ''),]
 
 
 n.portion = 5
@@ -131,6 +157,12 @@ res1 = lm(accession ~ pangenome, data = df[1:round(nrow(df)/n.portion),])
 res2 = lm(accession ~ pangenome, data = df[nrow(df) - 1:round(nrow(df)/n.portion),])
 
 p <- ggplot(df, aes(pangenome, accession)) + 
+    annotate(geom = "rect",ymin = cep.pos.chr$start2, ymax = cep.pos.chr$stop2, xmin = -Inf, xmax = Inf,
+           fill = '#9AC5C7', alpha = 0.2) +
+    annotate(geom = "rect",ymin = cep.pos.chr$start3, ymax = cep.pos.chr$stop3, xmin = -Inf, xmax = Inf,
+           fill = '#176B87', alpha = 0.2) +
+    annotate(geom = "rect",ymin = cep.pos.chr$start, ymax = cep.pos.chr$stop, xmin = -Inf, xmax = Inf,
+           fill = '#176B87', alpha = 0.5) +
   geom_point(size = 0.1) +
   # geom_line(data = df[c(1, nrow(df)),], aes(pangenome, accession), color = 'red') + 
   geom_abline(intercept = res1$coefficients[1], slope = res1$coefficients[2], color = '#594A4E', alpha = 0.4, size = 2.5) +
@@ -138,7 +170,8 @@ p <- ggplot(df, aes(pangenome, accession)) +
   theme_minimal()+ theme(aspect.ratio=df[nrow(df),2]/df[nrow(df),1]) + 
   # ggtitle(paste('Chromosome', i.chr)) + 
   annotate("text", x = min(df$pangenome), y = max(df$accession), 
-             label = paste('Chromosome', i.chr), hjust = 0, vjust = 0.8) +
+             label = paste('Chromosome ', i.chr, '; Slope ', round(df[nrow(df),2]/df[nrow(df),1],2), sep = ''), 
+           hjust = 0, vjust = 0.8) +
   xlab('Pangenome coordinate')
 
 if(i.acc != 1){
@@ -146,9 +179,8 @@ if(i.acc != 1){
 } else {
   p = p + ylab('Ref. genome coordinate')
 }
+
 p
-
-
 
 
 pdf(paste(path.figures, 'sv_coord_corresp_chr_',i.chr,'_acc_',colnames(sv.pos.beg)[i.acc],'.pdf', sep = ''), 
@@ -191,6 +223,8 @@ dev.off()
 ```
 ## Combined with correspondence
 ```{r}
+
+
 gx = list()
 for(len.min in c(1, 1000)){
   df.plot = sv.all[(sv.all$len >= len.min) & (sv.all$chr == i.chr),]
@@ -218,7 +252,18 @@ pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),
 pp
 
 
-pdf(paste(path.figures, 'sv_comb_pangen_coord_chr_',i.chr,'.pdf', sep = ''), width = 5.2, height = 6)
+
+pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) , 
+          gx[[2]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + 
+            theme(legend.position = c(1, 1), 
+                  legend.justification = c(1, 0.4),
+                  legend.key.size = unit(0.3, "cm")),  
+          nrow=2, heights = c(1, 0.14))
+
+pp
+
+
+pdf(paste(path.figures, 'sv_comb_pangen_coord_chr_',i.chr,'.pdf', sep = ''), width = 5, height = 4)
 print(pp)
 dev.off()
 ```
@@ -310,67 +355,121 @@ cnt = as.matrix(table(sv.se$freq.max[sv.se$len>=len.min], sv.se$len.gr[sv.se$len
 
 cnt = rowSums(cnt)
 df = data.frame(Var1 = 1:length(cnt), value = cnt)
-g <- ggplot(df, aes(Var1, value)) + geom_line(size = 2) + theme_minimal() + 
+g <- ggplot(df, aes(Var1, value)) +
+  annotate(geom = "rect",xmin = -Inf, xmax = 3, ymin = -Inf, ymax = Inf,
+           fill = 'grey60', alpha = 0.5) +
+    annotate(geom = "rect",xmin = 25, xmax = Inf, ymin = -Inf, ymax = Inf,
+           fill = 'grey60', alpha = 0.5) +
+    geom_line(size = 2) + theme_minimal() + 
   theme(legend.position='none',
         strip.text.y = element_text(angle = 0)) + 
+  geom_segment(aes(x = 1, y = 15000, xend = 27, yend = 15000), 
+               arrow = arrow(type = "closed", length = unit(0.2, "cm"), ends = "both"), 
+               color = "grey20") +
+  annotate("text", x = 2.5, y = 14000, label = "Singleton\ninsertions", hjust = "left", vjust = 1, color = "grey20", 
+           size = 2.5) +
+  annotate("text", x = 25.5, y = 14000, label = "Singleton\ndeletions", hjust = "right", vjust = 1, color = "grey20",
+           size = 2.5)+
   viridis::scale_color_viridis() +
   xlab('Frequency of presence') + 
   ylab('Absolute number') +
   theme(
     panel.background = element_rect(fill = "white", color = 'white'),
-    plot.background = element_rect(fill = "white")
+    plot.background = element_rect(fill = "white", color = 'white')
   ) 
 g
 
 
-pdf(paste(path.figures, 'sv_freq_hist.pdf', sep = ''), width = 3, height = 2)
+pdf(paste(path.figures, 'sv_freq_hist.pdf', sep = ''), width = 2.6, height = 1.7)
 print(g)     # Plot 1 --> in the first page of PDF
 dev.off()
 ```
 ## Hist by len-groups
 ```{r}
 
-len.min = 15 
-cols = c('#EDF1D6','#DDFFBB','#66bb6a', '#3e8c4c', '#cca64e', '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink')
-names(cols) <-levels(sv.se$len.gr)
+len.min = 15
+cols = colorRampPalette(colors = c('#82CD47','#66bb6a', '#3e8c4c', '#cca64e', 
+                                   '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink'),
+                        )(length(levels(sv.se$len.gr)))
+names(cols) <- levels(sv.se$len.gr)
 
 tbl = table(sv.se[(sv.se$len > len.min), c('len.gr', 'freq.max')])
 tbl = tbl[rowSums(tbl) != 0,]
 # tbl = apply(tbl, 2, function(x) x / sum(x))
 p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, color=len.gr)) +
   geom_line(size = 2) +
-  facet_grid(cols = vars(len.gr)) + 
+  # facet_grid(cols = vars(len.gr)) + 
+  facet_wrap(vars(len.gr), strip.position = "bottom", nrow = 1) + 
  theme_minimal() + xlab('Frequency of presence') + ylab('Absolute number') + 
   scale_color_manual(values=cols[names(cols) %in% rownames(tbl)],  
                      name ='Indel Length (bp)') +
   guides(color = FALSE) 
 p
 # 
-pdf(paste(path.figures, 'sv_freq_hist_length.pdf', sep = ''), width = 7, height = 4)
+pdf(paste(path.figures, 'sv_freq_hist_length.pdf', sep = ''), width = 7, height = 3)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
+
+
+tbl = table(sv.se[(sv.se$len < 100), c('len.gr', 'freq.max')])
+tbl = tbl[rowSums(tbl) != 0,]
+tbl.melt = reshape2::melt(tbl)
+p0 <- ggplot(data=tbl.melt[seq(1, nrow(tbl.melt),3),], aes(x=freq.max, y = value, color=len.gr)) +
+  geom_line(size = 2) +
+  facet_wrap(vars(len.gr), strip.position = "bottom", nrow = 1) + 
+ theme_minimal() + xlab('') + 
+  ylab('Absolute number') +  #width = 1.5
+  # ylab(NULL) +  #width = 1.5
+  scale_color_manual(values=cols[names(cols) %in% rownames(tbl)],  
+                     name ='Indel Length (bp)') +
+  # + theme(aspect.ratio=2/1)
+  guides(color = FALSE) + theme(
+    panel.background = element_rect(fill = "white", color = 'white'),
+    plot.background = element_rect(fill = "white")
+  )  
+
+p0
+
+
+
+pp = ggarrange(p0 + annotate(geom = "rect",ymin = -Inf, ymax = 11000, xmin = -Inf, xmax = Inf,
+           fill = 'grey60', alpha = 0.5),
+               p + ylab(NULL), 
+          ncol=2, widths = c(0.1, 1))
+
+pp
+
+
+pdf(paste(path.figures, 'sv_freq_hist_length_ext.pdf', sep = ''), width = 7, height = 3)
+print(pp)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
 
 ```
 
 ## Bar-plots
 ```{r}
 len.min = 15
-cols = c('#EDF1D6','#DDFFBB','#66bb6a', '#3e8c4c', '#cca64e', '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink')
-names(cols) <-levels(sv.se$len.gr)
 
 # tbl = table(sv.se[, c('len.gr', 'freq.max')])
 tbl = table(sv.se[(sv.se$len > len.min), c('len.gr', 'freq.max')])
 tbl = tbl[rowSums(tbl) != 0,]
 tbl = apply(tbl, 2, function(x) x / sum(x))
 p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, fill=len.gr)) +
-  geom_bar(stat="identity") + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') + scale_fill_manual(values=cols[names(cols) %in% rownames(tbl)],  name ='Indel Length (bp)') +
-  # scale_y_continuous(expand = c(0, 0)) +
-  # scale_x_discrete(expand = c(0, 0))  +
-  theme(legend.key.size = unit(0.5, "cm"),
-        legend.margin=margin(0,0,0,0))
+  geom_bar(stat="identity") + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') + scale_fill_manual(values=cols[names(cols) %in% rownames(tbl)],  name ='seSV len (bp)') +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0, 0))  +
+  theme(legend.key.size = unit(0.3, "cm"),
+        legend.position=c(1,1),legend.justification=c(1,1),
+        legend.direction="vertical",
+        legend.box="horizontal",
+        legend.box.just = c("top"), 
+        legend.background = element_rect(fill=alpha('white', 0.75)),
+        legend.margin = margin(2, 2, 2, 2))
 p
 
-pdf(paste(path.figures, 'sv_freq_length_composit.pdf', sep = ''), width = 5.2, height = 4)
+pdf(paste(path.figures, 'sv_freq_length_composit.pdf', sep = ''), width = 3.5, height = 2.7)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
 ```
@@ -2185,7 +2284,22 @@ sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stri
 
 ## Statisticks
 ```{r}
+
+
 sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+
+lev.replace = c('[1,10]', '(10,15]')
+lev.new = '[1,15]'
+
+s.levels = as.character(levels(sv.se$len.gr))
+s.levels = s.levels[!(s.levels %in% lev.replace)]
+s.levels = c(lev.new, s.levels)
+
+sv.se$len.gr = as.character(sv.se$len.gr)
+sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
+sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
+
+
 sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
 
 min.len = 100
