@@ -58,7 +58,9 @@ dotplot <- function(seq1, seq2, wsize, nmatch) {
   return(p)
 }
 
-
+# Sequence sould be just a vector of letters
+# > head(seq1, 10)
+# [1] "a" "a" "t" "t" "a" "t" "a" "t" "c" "t"
 seqComplexity <- function(seq1, method='dotplot', wsize=10, nmatch=9) {
   
   mx1 = toupper(seq2mx(seq1, wsize))
