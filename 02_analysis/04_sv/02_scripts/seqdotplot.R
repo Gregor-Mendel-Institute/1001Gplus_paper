@@ -57,3 +57,18 @@ dotplot <- function(seq1, seq2, wsize, nmatch) {
   p 
   return(p)
 }
+
+
+seqComplexity <- function(seq1, method='dotplot', wsize=10, nmatch=9) {
+  
+  mx1 = toupper(seq2mx(seq1, wsize))
+  result = mxComp(mx1, mx1, wsize, nmatch)
+  
+  seq1.rc = rev(seqinr::comp(seq1))
+  mx1.rc = toupper(seq2mx(seq1.rc, wsize))
+  result.rc = mxComp(mx1, mx1.rc, wsize, nmatch)
+  
+  n.match = (nrow(result) + nrow(result.rc)) / length(seq1) 
+  
+  return(n.match)
+}
