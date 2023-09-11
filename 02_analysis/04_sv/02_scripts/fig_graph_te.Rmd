@@ -8,6 +8,7 @@ output: html_notebook
 ```{r, message=FALSE}
 # library(ggplot2)
 # library(reshape2)
+library(ggpattern)
 library(viridis)
 library(colorRamps)
 library(gridExtra)
@@ -25,6 +26,7 @@ discrete_rainbow <- colour("discrete rainbow")
 
 path.base = '../../../'
 path.work = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
+path.tair = paste(path.base, '01_data_common/01_tair10/', sep = '')
 path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
 path.svs = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', sep = '')
 # path.genes = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes/', sep = '')
@@ -32,6 +34,29 @@ path.svs = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', 
 # sim.cutoff = 0.9
 
 sim.cutoff = 0.85
+
+```
+
+# Coolors
+```{r}
+
+
+fam.palette = c()
+fam.palette['Unassigned'] = 'grey'
+fam.palette['Mix'] = 'grey20'
+fam.palette['Mix with Helitron'] = '#266D98'
+fam.palette['Helitron'] = '#BCACDE'
+fam.palette["LTR/Copia"] = '#BFDB38'
+fam.palette["LTR/Gypsy"] = '#54B435'
+fam.palette["DNA/HAT"] = '#F9B5D0'
+fam.palette["DNA+"] = '#C8658C'
+fam.palette["DNA/MuDR"] = '#971549'
+
+
+fam.palette["LINE"] = '#FFC26F'
+fam.palette["RathE1/2/3_cons"] = '#C38154'
+fam.palette["SINE"] = '#884A39'
+fam.palette["TEG"] = '#4E3636'
 
 ```
 
@@ -916,6 +941,37 @@ res.nest[(res.nest$V1 %in% names) & (res.nest$V8 %in% names), ]
 
 
 # SVs
+## Readings seSVs
+```{r}
+
+sv.se = readRDS(paste(path.svs, 'sv_se.rds', sep = ''))
+
+# Rename length groups
+lev.replace = c('[1,10]', '(10,15]')
+lev.new = '[1,15]'
+
+s.levels = as.character(levels(sv.se$len.gr))
+s.levels = s.levels[!(s.levels %in% lev.replace)]
+s.levels = c(lev.new, s.levels)
+s.levels = gsub("e\\+03", "k", s.levels)
+
+sv.se$len.gr = as.character(sv.se$len.gr)
+sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
+sv.se$len.gr = gsub("e\\+03", "k", sv.se$len.gr)
+sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
+
+
+# Replace families
+sv.se$fam = as.character(sv.se$fam)
+sv.se$fam <- gsub("Helitron/.*", "Mix with Helitron", sv.se$fam)
+
+
+sv.se$te = factor(sv.se$te, levels = c('isTE', 'isTEpart', 'hasTE', 'hasTEpart', 'noTE'))
+
+
+
+```
+
 ## Reading nestedness
 ```{r}
 
@@ -950,10 +1006,9 @@ res.nest0 = res.nest
 
 
 ## TE stat
+### In graph - not in graph
 ```{r}
 res.nest = res.nest0
-
-sv.se = readRDS(paste(path.svs, 'sv_se.rds', sep = ''))
 
 sv.se.len = sv.se[sv.se$len >= 100,]
 sv.se.len$in.connect = sv.se.len$name %in% names(res.nest.len)
@@ -970,36 +1025,53 @@ names(cols) = te.content.names
 df$Var2 = factor(df$Var2, levels = rev(c('isTE', 'isTEpart', 'hasTE', 'hasTEpart', 'noTE')))
 
 
+# install.packages("ggpattern")
+
+
 p = ggplot(df, aes(x = Var2, y = value, fill = Var2, alpha = Var1, color = Var1)) +
-  geom_col(position = "dodge", width = 0.8) +
+  geom_col_pattern( aes(pattern = Var1),
+    # pattern = rep(c('none', "stripe"), 5),
+    pattern_density = 0.1,
+    pattern_spacing = 0.025,
+    pattern_fill = "grey70", 
+    position = "dodge", 
+    width = 0.8
+  ) + 
+  # geom_col(position = "dodge", width = 0.8) +
   scale_alpha_manual(values = c(0.8, 1), labels = c("No", "Yes")) +
-  scale_color_manual(values = c('transparent', 'black'), labels = c("not in graph", "in graph")) +
-  labs(fill = "", color='Connected to others') +
+  scale_color_manual(values = c('black', 'black'), labels = c("not in graph", "in graph")) +
+  scale_pattern_manual(values = c("stripe", 'none'), labels = c("in graph", "not in graph"),
+                       breaks = c(TRUE, FALSE)) +
+  labs(fill = "", pattern='Connected to others') +
   scale_fill_manual(values = cols) +
-  xlab("") +
+  xlab(NULL) +
   ylab("Number of SVs") +
   theme(axis.text.y = element_blank()) + 
-  guides(alpha = "none", fill = 'none') +
+  guides(alpha = "none", fill = 'none', color = 'none') +
   theme_minimal() + coord_flip() +
   theme(
     legend.position = c(0.7, 0.3),     # Adjust these coordinates as needed
-    legend.background = element_rect(fill="transparent", color='grey70')  # Makes the legend background transparent
+    legend.background = element_rect(fill="transparent", color='grey70')  
   ) +
-  guides(color = guide_legend(override.aes = list(fill = "#AEC3AE")))  +
-  theme(axis.text.y = element_blank())
+  theme(axis.text.y = element_blank()) +
+  guides(pattern = guide_legend(override.aes = list(fill = c("white"), color= 'black')))  
 p
 
-
-pdf(paste(path.figures, 'graph_mob_in_graph.pdf', sep = ''), width = 3.5, height = 4)
+pdf(paste(path.figures, 'graph_mob_in_graph.pdf', sep = ''), width = 3, height = 4)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
+
 ```
 
-## TE families in SV types
+
+
+### TE families in SV types
 ```{r}
+
 sv.se.len = sv.se[sv.se$len >= 100,]
 cnt.fam.sv = table(sv.se.len$fam[sv.se.len$fam!=''], sv.se.len$te[sv.se.len$fam!=''])
 cnt.fam.sv = t(apply(cnt.fam.sv, 1, function(x) x/sum(x)))
+cnt.fam.sv = cnt.fam.sv[, colSums(cnt.fam.sv) != 0]
 cnt.fam.sv = reshape2::melt(cnt.fam.sv)
 
 p = ggplot(cnt.fam.sv, aes(x = Var2, y = Var1, color = Var2)) + 
@@ -1029,7 +1101,8 @@ g = ggplot(cnt.fam.sv, aes(x = names, y = value)) +
 g 
 
 
-pp = ggpubr::ggarrange(p, g, ncol = 2, widths = c(0.75, 0.25))
+pp = ggpubr::ggarrange(p + xlab('TE content') + scale_x_discrete(labels = c('is compl.', 'is fragm.', 
+                               'cont. compl.', 'cont. fragm.')) , g, ncol = 2, widths = c(0.75, 0.25))
 pp
 
 pdf(paste(path.figures, 'graph_mob_te_fam_sv_type.pdf', sep = ''), width = 6, height = 4)
@@ -1044,13 +1117,77 @@ table(sv.se.len$fam[idx], sv.se.len$te[idx])
 idx = (sv.se.len$fam!='') & (sv.se.len$freq.max >= 25) & (sv.se.len$len >= 100) 
 table(sv.se.len$fam[idx], sv.se.len$te[idx])
 ```
+### TE fam: TAIR10
+```{r}
+f.te.ref = paste(path.tair, 'new_te.fasta', sep = '')
+lines = readLines(f.te.ref)
+lines = grep('^>', lines, value = T)
+
+ref.fam = sapply(lines, function(x) strsplit(x, '\\|')[[1]][9])
+
+
+indices <- grep("^DNA(?!/HAT|/MuDR)", ref.fam, value = FALSE, perl = TRUE)
+ref.fam[indices] = 'DNA+'
+
+indices <- grep("^RathE", ref.fam, value = FALSE, perl = TRUE)
+ref.fam[indices] = 'RathE1/2/3_cons'
+
+indices <- grep("^LINE", ref.fam, value = FALSE, perl = TRUE)
+ref.fam[indices] = 'LINE'
+ref.fam[ref.fam == 'RC/Helitron'] = 'Helitron'
+
+ref.fam.cnt = table(ref.fam)
+
+
+
+df = cnt.fam.sv
+df$ref = as.numeric(ref.fam.cnt[df$names])
+df = df[!is.na(df$ref),]
+
+plot(df$value, df$ref)
+
+
+
+p <- ggplot(df, aes(x = ref, y = value, color = names)) +
+  geom_smooth(aes(group = 1), method = "lm", formula = y ~ x, se = FALSE, color = 'grey70') + 
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = names), max.overlaps = 20) +
+  # xlab("log # in TAIR10 annotation") +
+  # ylab("log # in SVs") +
+  # scale_x_log10() +
+  # scale_y_log10() +
+  xlab("# in TAIR10 annotation") +
+  ylab("# in SVs") +
+  theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_minimal()
+p
+
+
+lm_model <- lm(value ~ ref, data = df)
+slope <- coef(lm_model)[2]
+
+
+p = p + annotate("text", x = min(df$ref), y = max(df$value), 
+           label = paste('Slope:', round(slope, 3)), hjust = 0, vjust = 1)
+
+
+
+pdf(paste(path.figures, 'graph_mob_te_fam_tair10.pdf', sep = ''), width = 4, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
 
 ## Filtration
 ```{r}
 
 res.nest = res.nest0
 
-sv.names.mix = sv.se$name[sv.se$fam == 'Mix']
+sv.names.mix = sv.se$name[grep("^Mix", sv.se$fam)]
 res.nest = res.nest[!(res.nest$V1 %in% sv.names.mix),]
 res.nest = res.nest[!(res.nest$V8 %in% sv.names.mix),]
 
@@ -1084,7 +1221,9 @@ te.enges.names = unique(c(edges[,1], edges[,2]))
 
 tmp = sv.se$te
 names(tmp) = sv.se$name
-te.enges.type = tmp[te.enges.names]
+te.enges.type = as.character(tmp[te.enges.names])
+names(te.enges.type) <- names(tmp[te.enges.names])
+
 
 tmp = sv.se$fam
 names(tmp) = sv.se$name
@@ -1216,42 +1355,11 @@ dev.off()
 
 ### Colored by TE family
 ```{r}
-g.fam.names = sort(unique(g.nodes.fam))
-# fam.palette <- viridis_pal(option = "D")(length(g.fam.names))  
-fam.palette <- rainbow(length(g.fam.names))
-names(fam.palette) = g.fam.names
 
-# ---- New colors for TE families
-fam.palette = c()
-idx.pallete = c()
-
-idx.fam <- grep("^Helitron", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#BFACE2', '#266D98', '#422B72'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam <- grep("^LTR", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#BFDB38', '#54B435'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam <- grep("^DNA", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#F9B5D0', '#971549'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam = setdiff(1:length(g.fam.names), idx.pallete)
-tmp.palette <- colorRampPalette(c('#FFC26F', '#C38154', '#884A39', '#4E3636'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-names(fam.palette) = g.fam.names[idx.pallete]
-fam.palette['Unassigned'] = 'grey'
-fam.palette['Mix'] = 'black'
-
+if(length(setdiff(g.nodes.fam, names(fam.palette)))!=0) stop('not all families are defined')
 
 set.seed(20)
-p <- ggnet2(g.part, label = F, edge.color = "black", 
+p <- ggnet2(g.part, label = F, edge.color = "grey20", 
             node.size = g.nodes.cnt[b.graph.names], 
             color = g.nodes.fam[b.graph.names],
             # mode = 'kamadakawai',

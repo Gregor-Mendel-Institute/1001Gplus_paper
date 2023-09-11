@@ -521,16 +521,20 @@ te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
 cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
 names(cols) <- te.content.names
 
+sv.se$te = factor(sv.se$te, levels = c('noTE', 'isTE', 'isTEpart', 'hasTE', 'hasTEpart'))
 
 
 tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
 tbl = apply(tbl, 2, function(x) x / sum(x))
 
 df = reshape2::melt(tbl)
-df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
 p <- ggplot() +
   geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
-  theme_minimal() + scale_fill_manual(values=cols, name ='TE content') +
+  theme_minimal() + 
+  scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
   xlab('Frequency of presence') + ylab('')  +
    theme(legend.justification = c(1, 0))
 p
@@ -547,7 +551,10 @@ tbl = apply(tbl, 2, function(x) x / sum(x))
 df = reshape2::melt(tbl)
 p <- ggplot() +
   geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
-  theme_minimal() + scale_fill_manual(values=cols, name ='TE content') +
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
   xlab('Frequency of presence') + ylab('') +
    theme(legend.justification = c(1, 0))
 p
@@ -562,10 +569,13 @@ tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
 tbl.norm = colSums(tbl[row.names(tbl) != 'noTE',])
 tbl = apply(tbl, 1, function(x) x / tbl.norm)
 df = reshape2::melt(tbl)
-df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
 p <- ggplot() +
   geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
-  theme_minimal() + scale_fill_manual(values=cols, name ='TE content') +
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
   xlab('Frequency of presence') + ylab('') +
    theme(legend.justification = c(1, 0))
 p
@@ -586,10 +596,13 @@ tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
 # tbl = apply(tbl, 2, function(x) x / sum(x))
 
 df = reshape2::melt(tbl)
-df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
 p <- ggplot() +
   geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
-  theme_minimal() + scale_fill_manual(values=cols, name ='TE content') +
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
   xlab('Frequency of presence') + ylab('') +
    theme(legend.justification = c(1, 0))
 p
@@ -612,9 +625,10 @@ tbl
 df <- data.frame(category = names(tbl), value = tbl)
 df$p = paste(round(df$value / sum(df$value), 2) * 100, '%', sep = '')
 df$p = paste(df$value, '(', df$p, ')', sep = '')
+df$category = factor(df$category, levels = c('noTE', 'isTE', 'isTEpart', 'hasTE', 'hasTEpart'))
 p = ggplot(df, aes(x = "", y = value, fill = category)) +
   geom_bar(width = 1, stat = "identity") +
-  coord_polar(theta = "y") +
+  coord_polar(theta = "y", start = tbl[1] / sum(tbl) * pi) +
   theme_void() +
   geom_text(aes(y = sum(value) - cumsum(value) + value/2, label = value), color = "black") +
   scale_fill_manual(values=cols, name ='TE content') +
@@ -636,13 +650,17 @@ dev.off()
 g = ggplot(sv.se[sv.se$len > 100,], aes(x = te, y = len, fill = te)) +
   geom_violin() +
   ylim(0, 25000) +
-  scale_fill_manual(values = cols, name ='TE content') +
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
   
   xlab('TE content') + ylab('Length, log10') +
   scale_y_log10() + 
   geom_jitter(width = 0.2, size = 1, alpha = 0.05,stroke = 0) +
   theme_minimal() +
-  guides(fill = FALSE) + theme(legend.position = "none")
+  guides(fill = FALSE) + theme(legend.position = "none") +
+  scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment'))
 
 g
 
