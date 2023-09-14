@@ -5,12 +5,12 @@
 #'
 #' @return A ggplot2 object of the visualized network graph.
 #'
-ggigraph <- function(g, label = T){
+ggigraph <- function(g, label = F, size = 5){
   edges.linear = get.edgelist(g)
   g.part <- network(edges.linear, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
   set.seed(20)
   p <- ggnet2(g.part, label = label, edge.color = "black",
-              size = 5, color = '#468B97',
+              size = size, color = '#468B97',
               arrow.gap = 0.04, arrow.size = 5,
               # mode = "kamadakawai"
   )
@@ -23,17 +23,135 @@ ggigraph <- function(g, label = T){
 #' @param label Logical value indicating whether to label the nodes (default is TRUE).
 #'
 #' @return A ggplot2 object representing the visualized network graph.
-ggedges <- function(edges.linear, label = T){
+ggedges <- function(edges.linear, label = F, size = 5){
   g.part <- network(edges.linear, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
   set.seed(20)
   p <- ggnet2(g.part, label = label, edge.color = "black",
-              size = 5, color = '#468B97',
+              size = size, color = '#468B97',
               arrow.gap = 0.04, arrow.size = 5,
               # mode = "kamadakawai"
   )
   return(p)
 }
 
+#' Get connected components of a directed graph
+#'
+#' This function takes a set of directed edges and calculates the connected
+#' components in the corresponding directed graph.
+#'
+#' @param edges A matrix representing directed edges.
+#'
+#' @return A list of connected components, where each component is represented
+#' as a vector of vertex indices.
+getGraphComponents <- function(edges){
+  g <- igraph::simplify(igraph::make_graph(t(edges), directed = T))
+  g.comp <- igraph::components(g)
+  return(g.comp)
+}
+
+#' Create a graph from BLAST results
+#'
+#' This function takes BLAST results in tabular format and generates a graph
+#'
+#' @param bl.res The BLAST results in tabular format, basically a table with columns:
+#' V1 and V8 contain names
+#' V2-V3 - positions of match in sequence "query"
+#' V4-V5 - positions of match in sequence "subject"
+#' V6 - similarity from 0 to 100
+#' V7 - length
+#' 
+#' @param sim.cutoff similarity to establish an edge between sequences
+#' this is for both: (1) sequence blast similarity, (2) length similarity.
+#' 
+#' @param i.len.field index for the field, where you see the length of the sequence in names
+#' @param collapse a boolean value indicating whether to collapse sequences with mutual similarity into nodes (default is TRUE).
+#'
+#' @return The graph represented as the list with the following components:
+#'   \itemize{
+#'     \item{edges}{A matrix representing the edges of the graph}
+#'     \item{nodes}{A matrix reflecting the relationship between BLAST queries and collapsed nodes.}
+#'     \item{node.traits}{A data frame representing traits associated with nodes.}
+#'   }
+#' 
+getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collapse = T, refine = T){
+  
+  # nestedness
+  bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+  bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+  
+  cat('Find Nestedness...')
+  res.nest = findNestedness(bl.res, use.strand = F)
+  cat(' done!\n')
+  
+  # optimised length definition
+  res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
+  if(sum(is.na(res.nest.len)) != 0){
+    stop(paste('Be careful with extracting sequence lengths.\n',
+               'It a positionsl information in their names.\n',
+               'Current length slot is ', i.len.field, sep = ''))
+  }
+  
+  res.nest$len1 = res.nest.len[res.nest$V1]
+  res.nest$len8 = res.nest.len[res.nest$V8]
+  res.nest$p1 = res.nest$C1 / res.nest$len1
+  res.nest$p8 = res.nest$C8 / res.nest$len8
+  
+  # Remain only those blast hits, which satisfy sim.cutoff
+  res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
+                            (res.nest$p8 >= sim.cutoff),]
+  
+  # get edges of coverage: (1) -> (2), i.e. (1) is covered by (2)
+  idx.1.to.2 = res.nest$p1 >= sim.cutoff
+  edges = cbind(res.nest$V1[idx.1.to.2], res.nest$V8[idx.1.to.2])
+  idx.2.to.1 = res.nest$p8 >= sim.cutoff
+  edges = rbind(edges, cbind(res.nest$V8[idx.2.to.1], res.nest$V1[idx.2.to.1]))
+  
+  if(!collapse){
+    res.list = list(edges = edges, nodes = c(), nodes.traits = c())
+    return(res.list)
+  }
+  
+  # define nodes
+  # if some have mutual arrows - they should go to one node
+  # Idea: create the graph on those elements, which have mutual arrows and take the connected components
+  idx.mutual = idx.1.to.2 & idx.2.to.1
+  edges.mutual = cbind(res.nest$V1[idx.mutual], res.nest$V8[idx.mutual])
+  names.rest = setdiff(c(edges), c(edges.mutual))
+  
+  graph.mutual <- igraph::simplify(igraph::make_graph(t(edges.mutual), directed = T))
+  graph.mutual.comp <- igraph::components(graph.mutual)
+  
+  nodes.mutual =     data.frame(node = paste('N', graph.mutual.comp$membership, sep = ''), 
+                                name = names(graph.mutual.comp$membership))
+  nodes.rest = data.frame(node = paste('R', (1:length(names.rest)), sep = ''), 
+                          name = names.rest)
+  nodes = rbind(nodes.mutual, nodes.rest)
+  rownames(nodes) = nodes$name
+  
+  nodes.traits = data.frame(cnt = c(table(nodes$node)))
+  nodes.traits$node = rownames(nodes.traits)
+  
+  # Redefine edges but with node names
+  edges.compact = cbind(nodes[edges[,1], 'node'], nodes[edges[,2], 'node'])
+  edges.compact = edges.compact[edges.compact[,1] != edges.compact[,2],]
+  edges.compact = unique(edges.compact)
+  
+  
+  nodes.traits$in.graph = nodes.traits$node %in% c(edges.compact)
+  
+  # Some sequences are thr same, but do not form any unmutual mestedness,so no edges in the graph
+  table(nodes.traits$cnt[!nodes.traits$in.graph])
+  
+  if(refine){
+    cat('Find Nestedness...')
+    edges.compact = refineDirectEdges(edges.compact, echo = F)
+    cat(' done!\n')
+  }
+  
+  res.list = list(edges = edges.compact, nodes = nodes, nodes.traits = nodes.traits)
+  return(res.list)
+  
+}
 
 #' Remove direct edges from a graph. WORKING VERSION!!
 #'
@@ -147,6 +265,89 @@ refineDirectEdges <- function(edges.compact, echo = T){
 }
 
 
+#' Create a graph from BLAST results
+#'
+#' This function takes BLAST results in tabular format and generates a graph
+#'
+#' @param bl.res The BLAST results in tabular format, basically a table with columns:
+#' V1 and V8 contain names
+#' V2-V3 - positions of match in sequence "query"
+#' V4-V5 - positions of match in sequence "subject"
+#' V6 - similarity from 0 to 100
+#' V7 - length
+#' 
+#' @param sim.cutoff similarity to establish an edge between sequences
+#' this is for both: (1) sequence blast similarity, (2) length similarity.
+#' 
+#' @param i.len.field index for the field, where you see the length of the sequence in names
+#'
+#' @return A matrix representing the edges of the graph
+#' 
+old_getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5){
+  bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+  
+  bl.res.init = bl.res
+  bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+  
+  res.nest = findNestedness(bl.res, use.strand = F)
+  
+  message('be careful with extracting sequence lengths, it a positionsl information in their names')
+  res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
+  
+  res.nest$len1 = res.nest.len[res.nest$V1]
+  res.nest$len8 = res.nest.len[res.nest$V8]
+  res.nest$p1 = res.nest$C1 / res.nest$len1
+  res.nest$p8 = res.nest$C8 / res.nest$len8
+  
+  res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
+                            (res.nest$p8 >= sim.cutoff),]
+  
+  ## Creating the graph
+  
+  # all edges
+  idx = res.nest$p1 >= sim.cutoff
+  edges = cbind(res.nest$V1[idx], res.nest$V8[idx])
+  idx = res.nest$p8 >= sim.cutoff
+  edges = rbind(edges, cbind(res.nest$V8[idx], res.nest$V1[idx]))
+  te.enges.names = unique(c(edges[,1], edges[,2]))
+  
+  # nodes
+  idx = (res.nest$p1 >= sim.cutoff) & (res.nest$p8 >= sim.cutoff)
+  te.nodes = cbind(res.nest$V1[idx], res.nest$V8[idx])
+  
+  te.rest = setdiff(te.enges.names, c(te.nodes[,1], te.nodes[,2]))
+  
+  te.nodes.graph <- igraph::make_graph(t(te.nodes), directed = T)
+  te.nodes.graph <- igraph::simplify(te.nodes.graph)
+  te.nodes.comp <- igraph::components(te.nodes.graph)
+  
+  nodes = data.frame(node = paste('N', te.nodes.comp$membership, sep = ''), 
+                     te = names(te.nodes.comp$membership))
+  nodes.rest = data.frame(node = paste('R', (1:length(te.rest)), sep = ''), te = te.rest)
+  nodes = rbind(nodes, nodes.rest)
+  
+  rownames(nodes) = nodes$te
+  
+  
+  nodes.cnt = data.frame(cnt = c(table(nodes$node)))
+  nodes.cnt$node = rownames(nodes.cnt)
+  
+  
+  # Redefine edges but with node names
+  idx.endes = (edges[,1] %in% nodes$te) & (edges[,2] %in% nodes$te)
+  b.graph = cbind(nodes[edges[idx.endes,1], 'node'],nodes[edges[idx.endes,2], 'node'])
+  b.graph = unique(b.graph)
+  # b.graph = b.graph[b.graph[,1] != b.graph[,2],]
+  b.graph.uni = b.graph[b.graph[,1] == b.graph[,2],]
+  b.graph = b.graph[b.graph[,1] != b.graph[,2],]
+  
+  length(unique(c(b.graph[,1], b.graph[,2])))
+  
+  b.graph = refineDirectEdges_old(b.graph)
+  
+  return(b.graph)
+}
+
 #' Remove direct edges from a graph. OLD VERSION!!
 #'
 #' This function takes a list of edges and removes direct edges if a longer path exists.
@@ -162,7 +363,7 @@ refineDirectEdges <- function(edges.compact, echo = T){
 #'
 #' @return A list of edges without direct edges
 #'
-refineDirectEdges_old <- function(b.graph, echo = T){
+old_refineDirectEdges <- function(b.graph, echo = T){
   # reduce indirect arrows
   idx.remove = c()
   for(i.edge in 1:nrow(b.graph)){

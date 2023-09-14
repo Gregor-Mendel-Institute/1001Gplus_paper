@@ -15,11 +15,11 @@ library(viridis)
 library(colorRamps)
 library(gridExtra)
 library(ggplot2)
-library('igraph')
 library(ggnet)
 library(network)
 library(khroma)
 library(dplyr)
+library(igraph)
 
 source('similarity.R')
 source('graph_refinement.R')
@@ -27,100 +27,74 @@ source('graph_refinement.R')
 sunset <- colour("sunset")
 discrete_rainbow <- colour("discrete rainbow")
 
-path.base = '../../../'
-path.work = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
-
-
 sim.cutoff = 0.85
 
 ```
 
 
-# Find nestedness
+# Read Example
 ```{r}
 
-# Load similarity function
+bl.file = 'example_graph_5comp.txt'
+bl.res = read.table(bl.file, stringsAsFactors = F)
 
-bl.file = paste(path.work,'new_te_on_te.fasta',sep = '')
+i.len.field = 5
 
-bl.res = read.table(bl.file)
-bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+```
 
-bl.res.init = bl.res
-bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+# Graph construction
+## Whole graph
+```{r}
+g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, i.len.field = i.len.field, collapse = T, refine = F)
 
-res.nest = findNestedness(bl.res, use.strand = F)
-
-message('be careful with extracting sequence lengths, it a positionsl information in their names')
-res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][5]))
-  
-res.nest$len1 = res.nest.len[res.nest$V1]
-res.nest$len8 = res.nest.len[res.nest$V8]
-res.nest$p1 = res.nest$C1 / res.nest$len1
-res.nest$p8 = res.nest$C8 / res.nest$len8
-
-res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
-                          (res.nest$p8 >= sim.cutoff),]
+g.part <- network(g.content.comp$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+set.seed(239)
+p.init <- ggnet2(g.part, label = F, edge.color = "black",
+            # node.size = g.nodes.cnt[b.graph.names],
+            node.size = 1,
+            color = '#468B97',
+            arrow.gap = 0.01, arrow.size = 2,
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
 ```
 
 
-## Creating the graph
+## Refined graph
 ```{r}
-# all edges
-idx = res.nest$p1 >= sim.cutoff
-edges = cbind(res.nest$V1[idx], res.nest$V8[idx])
-idx = res.nest$p8 >= sim.cutoff
-edges = rbind(edges, cbind(res.nest$V8[idx], res.nest$V1[idx]))
-te.enges.names = unique(c(edges[,1], edges[,2]))
+g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, i.len.field = i.len.field, collapse = T)
 
-# nodes
-idx = (res.nest$p1 >= sim.cutoff) & (res.nest$p8 >= sim.cutoff)
-te.nodes = cbind(res.nest$V1[idx], res.nest$V8[idx])
+g.part <- network(g.content.comp$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+set.seed(239)
+p.refined <- ggnet2(g.part, label = F, edge.color = "black",
+            # node.size = g.nodes.cnt[b.graph.names],
+            node.size = 1,
+            color = '#468B97',
+            arrow.gap = 0.01, arrow.size = 2,
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
 
-te.rest = setdiff(te.enges.names, c(te.nodes[,1], te.nodes[,2]))
+```
 
-te.nodes.graph <- igraph::make_graph(t(te.nodes), directed = T)
-te.nodes.graph <- igraph::simplify(te.nodes.graph)
-te.nodes.comp <- igraph::components(te.nodes.graph)
+## Plot
+```{r}
+p.init
+p.refined
 
-nodes = data.frame(node = paste('N', te.nodes.comp$membership, sep = ''), 
-                   te = names(te.nodes.comp$membership))
-nodes.rest = data.frame(node = paste('R', (1:length(te.rest)), sep = ''), te = te.rest)
-nodes = rbind(nodes, nodes.rest)
+```
 
-rownames(nodes) = nodes$te
-
-
-nodes.cnt = data.frame(cnt = c(table(nodes$node)))
-nodes.cnt$node = rownames(nodes.cnt)
-
-
-# Redefine edges but with node names
-idx.endes = (edges[,1] %in% nodes$te) & (edges[,2] %in% nodes$te)
-b.graph = cbind(nodes[edges[idx.endes,1], 'node'],nodes[edges[idx.endes,2], 'node'])
-b.graph = unique(b.graph)
-# b.graph = b.graph[b.graph[,1] != b.graph[,2],]
-b.graph.uni = b.graph[b.graph[,1] == b.graph[,2],]
-b.graph = b.graph[b.graph[,1] != b.graph[,2],]
-
-length(unique(c(b.graph[,1], b.graph[,2])))
-
-# reduce indirect arrows
-idx.remove = c()
-for(i.edge in 1:nrow(b.graph)){
-  if(i.edge %% 1000 == 0) print(i.edge)
-  tmp.to = b.graph[b.graph[,1] == b.graph[i.edge,1],2]
-  tmp.from = b.graph[b.graph[,2] == b.graph[i.edge,2],1]
-  if(length(intersect(tmp.to, tmp.from)) > 0) idx.remove = c(idx.remove, i.edge)
-}
-idx.remove = unique(idx.remove)
-b.graph = b.graph[-idx.remove,]
-# b.graph = rbind(b.graph, b.graph.uni)
+# Stop
+```{r}
+stop('Script in progress...')
 ```
 
 
-# Plot graph
-## Preparation
+# Traits
 ```{r}
 g.nodes.cnt = nodes.cnt$cnt
 names(g.nodes.cnt) = nodes.cnt$node
@@ -129,10 +103,7 @@ b.graph.init = b.graph
 
 g.part <- network(b.graph, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
 b.graph.names = network.vertex.names(g.part)
-```
 
-## Plot
-```{r}
 p <- ggnet2(g.part, label = F, edge.color = "black",
             node.size = g.nodes.cnt[b.graph.names],
             color = '#468B97'
@@ -164,124 +135,9 @@ head(final.graph.comp$membership, 100)
 
 ```
 
-# Functions
-
-
-# Define nodes
-```{r}
-# slots 'V1' and 'V8' contain names
-# V2-V3 - positions of matrch in sequence 1
-# V4-V5 - positions of matrch in sequence 2
-# V6 - similarity from 0 to 100
-# V7 - length
-
-i.len.field = 5  # id of the field, where you see the length of the element
 
 
 
-# nestedness
-bl.res = bl.res[bl.res$V1 != bl.res$V8,]
-bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
-
-res.nest = findNestedness(bl.res, use.strand = F)
-
-# optimised length definition
-res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
-if(sum(is.na(res.nest.len)) != 0){
-  stop(paste('Be careful with extracting sequence lengths.\n',
-             'It a positionsl information in their names.\n',
-             'Current length slot is ', i.len.field, sep = ''))
-}
-  
-res.nest$len1 = res.nest.len[res.nest$V1]
-res.nest$len8 = res.nest.len[res.nest$V8]
-res.nest$p1 = res.nest$C1 / res.nest$len1
-res.nest$p8 = res.nest$C8 / res.nest$len8
-
-# Remain only those blast hits, which satisfy sim.cutoff
-res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
-                          (res.nest$p8 >= sim.cutoff),]
-
-# get edges of coverage: (1) -> (2), i.e. (1) is covered by (2)
-idx.1.to.2 = res.nest$p1 >= sim.cutoff
-edges = cbind(res.nest$V1[idx.1.to.2], res.nest$V8[idx.1.to.2])
-idx.2.to.1 = res.nest$p8 >= sim.cutoff
-edges = rbind(edges, cbind(res.nest$V8[idx.2.to.1], res.nest$V1[idx.2.to.1]))
-
-
-# define nodes
-# if some have mutual arrows - they should go to one node
-# Idea: create the graph on those elements, which have mutual arrows and take the connected components
-idx.mutual = idx.1.to.2 & idx.2.to.1
-edges.mutual = cbind(res.nest$V1[idx.mutual], res.nest$V8[idx.mutual])
-names.rest = setdiff(c(edges), c(edges.mutual))
-
-graph.mutual <- igraph::simplify(igraph::make_graph(t(edges.mutual), directed = T))
-graph.mutual.comp <- igraph::components(graph.mutual)
-
-nodes.mutual =     data.frame(node = paste('N', graph.mutual.comp$membership, sep = ''), 
-                       name = names(graph.mutual.comp$membership))
-nodes.rest = data.frame(node = paste('R', (1:length(names.rest)), sep = ''), 
-                        name = names.rest)
-nodes = rbind(nodes.mutual, nodes.rest)
-rownames(nodes) = nodes$name
-
-nodes.traits = data.frame(cnt = c(table(nodes$node)))
-nodes.traits$node = rownames(nodes.traits)
-
-# Redefine edges but with node names
-edges.compact = cbind(nodes[edges[,1], 'node'], nodes[edges[,2], 'node'])
-edges.compact = edges.compact[edges.compact[,1] != edges.compact[,2],]
-edges.compact = unique(edges.compact)
-
-message(nrow(edges.compact))
-message(nrow(nodes))
-
-nodes.traits$in.graph = nodes.traits$node %in% c(edges.compact)
-
-
-# Some sequences are thr same, but do not form any unmutual mestedness,so no edges in the graph
-table(nodes.traits$cnt[!nodes.traits$in.graph])
-
-```
-
-
-
-```{r}
-library(igraph)
-
-
-
-
-
-```
-
-
-```{r}
-g.final = igraph::make_graph(t(edges.final), directed = TRUE)
-g.final.comp <- igraph::components(g.final)
-
-i.comp = g.final.comp$membership['N791']
-
-names.comp = names(g.final.comp$membership)[g.final.comp$membership == i.comp]
-g.final.sub <- induced_subgraph(g.final, names.comp)
-ggigraph(g.final.sub)
-
-
-
-
-# -----
-g.final = igraph::make_graph(t(edges.compact), directed = TRUE)
-g.final.comp <- igraph::components(g.final)
-
-i.comp = g.final.comp$membership['N791']
-
-names.comp = names(g.final.comp$membership)[g.final.comp$membership == i.comp]
-g.final.sub <- induced_subgraph(g.final, names.comp)
-ggigraph(g.final.sub)
-
-
-```
 
 
 
