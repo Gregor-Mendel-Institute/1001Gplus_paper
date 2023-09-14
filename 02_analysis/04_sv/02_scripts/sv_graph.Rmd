@@ -1,6 +1,7 @@
 ---
 title: "Graph of TEs"
-output: html_notebook
+# output: html_notebook
+output: null_document
 ---
 
 This file contains a basic pipeline for creating a graph of nestedness 

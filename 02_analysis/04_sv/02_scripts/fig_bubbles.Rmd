@@ -1,6 +1,7 @@
 ---
 title: "Visualisation of Sebastian's data"
-output: html_notebook
+# output: html_notebook
+output: null_document
 ---
 
 # Setup
