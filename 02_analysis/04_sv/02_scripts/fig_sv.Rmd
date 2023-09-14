@@ -64,6 +64,8 @@ sv.pos.end = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), s
 # sv.se = sv.se[sv.se$gr %in% sv.my.seb$gr,]
 ```
 
+
+
 ## Stat
 ```{r}
 pokaz('Number of all SVs', nrow(sv.all))

@@ -21,6 +21,7 @@ library(khroma)
 library(dplyr)
 
 source('similarity.R')
+source('graph_refinement.R')
 
 sunset <- colour("sunset")
 discrete_rainbow <- colour("discrete rainbow")
@@ -161,5 +162,127 @@ final.graph.comp <- igraph::components(final.graph)
 head(final.graph.comp$membership, 100)
 
 ```
+
+# Functions
+
+
+# Define nodes
+```{r}
+# slots 'V1' and 'V8' contain names
+# V2-V3 - positions of matrch in sequence 1
+# V4-V5 - positions of matrch in sequence 2
+# V6 - similarity from 0 to 100
+# V7 - length
+
+i.len.field = 5  # id of the field, where you see the length of the element
+
+
+
+# nestedness
+bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+
+res.nest = findNestedness(bl.res, use.strand = F)
+
+# optimised length definition
+res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
+if(sum(is.na(res.nest.len)) != 0){
+  stop(paste('Be careful with extracting sequence lengths.\n',
+             'It a positionsl information in their names.\n',
+             'Current length slot is ', i.len.field, sep = ''))
+}
+  
+res.nest$len1 = res.nest.len[res.nest$V1]
+res.nest$len8 = res.nest.len[res.nest$V8]
+res.nest$p1 = res.nest$C1 / res.nest$len1
+res.nest$p8 = res.nest$C8 / res.nest$len8
+
+# Remain only those blast hits, which satisfy sim.cutoff
+res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
+                          (res.nest$p8 >= sim.cutoff),]
+
+# get edges of coverage: (1) -> (2), i.e. (1) is covered by (2)
+idx.1.to.2 = res.nest$p1 >= sim.cutoff
+edges = cbind(res.nest$V1[idx.1.to.2], res.nest$V8[idx.1.to.2])
+idx.2.to.1 = res.nest$p8 >= sim.cutoff
+edges = rbind(edges, cbind(res.nest$V8[idx.2.to.1], res.nest$V1[idx.2.to.1]))
+
+
+# define nodes
+# if some have mutual arrows - they should go to one node
+# Idea: create the graph on those elements, which have mutual arrows and take the connected components
+idx.mutual = idx.1.to.2 & idx.2.to.1
+edges.mutual = cbind(res.nest$V1[idx.mutual], res.nest$V8[idx.mutual])
+names.rest = setdiff(c(edges), c(edges.mutual))
+
+graph.mutual <- igraph::simplify(igraph::make_graph(t(edges.mutual), directed = T))
+graph.mutual.comp <- igraph::components(graph.mutual)
+
+nodes.mutual =     data.frame(node = paste('N', graph.mutual.comp$membership, sep = ''), 
+                       name = names(graph.mutual.comp$membership))
+nodes.rest = data.frame(node = paste('R', (1:length(names.rest)), sep = ''), 
+                        name = names.rest)
+nodes = rbind(nodes.mutual, nodes.rest)
+rownames(nodes) = nodes$name
+
+nodes.traits = data.frame(cnt = c(table(nodes$node)))
+nodes.traits$node = rownames(nodes.traits)
+
+# Redefine edges but with node names
+edges.compact = cbind(nodes[edges[,1], 'node'], nodes[edges[,2], 'node'])
+edges.compact = edges.compact[edges.compact[,1] != edges.compact[,2],]
+edges.compact = unique(edges.compact)
+
+message(nrow(edges.compact))
+message(nrow(nodes))
+
+nodes.traits$in.graph = nodes.traits$node %in% c(edges.compact)
+
+
+# Some sequences are thr same, but do not form any unmutual mestedness,so no edges in the graph
+table(nodes.traits$cnt[!nodes.traits$in.graph])
+
+```
+
+
+
+```{r}
+library(igraph)
+
+
+
+
+
+```
+
+
+```{r}
+g.final = igraph::make_graph(t(edges.final), directed = TRUE)
+g.final.comp <- igraph::components(g.final)
+
+i.comp = g.final.comp$membership['N791']
+
+names.comp = names(g.final.comp$membership)[g.final.comp$membership == i.comp]
+g.final.sub <- induced_subgraph(g.final, names.comp)
+ggigraph(g.final.sub)
+
+
+
+
+# -----
+g.final = igraph::make_graph(t(edges.compact), directed = TRUE)
+g.final.comp <- igraph::components(g.final)
+
+i.comp = g.final.comp$membership['N791']
+
+names.comp = names(g.final.comp$membership)[g.final.comp$membership == i.comp]
+g.final.sub <- induced_subgraph(g.final, names.comp)
+ggigraph(g.final.sub)
+
+
+```
+
+
+
 
 

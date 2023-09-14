@@ -1,6 +1,7 @@
 ---
 title: "Graph of TEs"
-output: html_notebook
+# output: html_notebook
+output: null_document
 ---
 
 
@@ -18,9 +19,12 @@ library(ggnet)
 library(network)
 library(khroma)
 library(dplyr)
+library(ggpubr)
+library(Biostrings)
 
 source('similarity.R')
 source('seqdotplot.R')
+source('msaplot.R')
 
 sunset <- colour("sunset")
 discrete_rainbow <- colour("discrete rainbow")
@@ -38,10 +42,24 @@ sim.cutoff = 0.85
 
 ```
 
-# Coolors
+# Colors
 ```{r}
 
+# ---- Colors of TE content ----
+te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
+te.cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
+names(te.cols) = te.content.names
 
+
+# ---- Colors of BLAST hits ----
+colors.blast.hits <- c("in graph" = "#676FA3",
+            "partial overlap" = "#FF9F29",
+            "1 self-hit" = "#6EBF8B",
+            "0 hits" = "#D82148",
+            "in graph but not in SVs" = "#151D3B")
+
+
+# ---- Colors of known TE families ----
 fam.palette = c()
 fam.palette['Unassigned'] = 'grey'
 fam.palette['Mix'] = 'grey20'
@@ -51,6 +69,7 @@ fam.palette["LTR/Copia"] = '#BFDB38'
 fam.palette["LTR/Gypsy"] = '#54B435'
 fam.palette["DNA/HAT"] = '#F9B5D0'
 fam.palette["DNA+"] = '#C8658C'
+fam.palette["DNA"] = '#C8658C'
 fam.palette["DNA/MuDR"] = '#971549'
 
 
@@ -58,6 +77,26 @@ fam.palette["LINE"] = '#FFC26F'
 fam.palette["RathE1/2/3_cons"] = '#C38154'
 fam.palette["SINE"] = '#884A39'
 fam.palette["TEG"] = '#4E3636'
+
+
+# Colors for new TEs
+g.cols = discrete_rainbow(length(unique(sv.memb$prot)))
+names(g.cols) = unique(sv.memb$prot)
+# names(g.cols) = c('no prot', "undefined prot", "reverse", "transpos","repeat","zinc", "receptor","defined prot")
+
+g.cols['disease'] = 'black'
+# g.cols['defined prot'] = '#F0B86E'
+# g.cols['repeat'] = '#CAE0AB'
+# g.cols['zink'] = '#1A5D1A'
+# g.cols['receptor'] = '#ED7B7B'
+
+g.cols['zinc'] = '#F45050'
+g.cols['repeat'] = '#EA906C'
+g.cols['receptor'] = '#F7D060'
+g.cols['reverse'] = '#98D8AA'
+g.cols['defined prot'] = '#7BAFDE'
+
+
 
 ```
 
@@ -115,12 +154,6 @@ df.query$family <- sapply(strsplit(df.query$query, "\\|"), function(x) x[9])
 df.query$subfam <- sapply(strsplit(df.query$query, "\\|"), function(x) x[8])
 
 
-my_colors <- colors <- c("in graph" = "#676FA3",
-            "partial overlap" = "#FF9F29",
-            "1 self-hit" = "#6EBF8B",
-            "0 hits" = "#D82148",
-            "in graph but not in SVs" = "#151D3B")
-
 
 # TEs, which are not in SVs
 te.in.svs = read.table(paste(path.work, 'blast_tes_on_sv.txt', sep = ''), stringsAsFactors = F)
@@ -134,8 +167,8 @@ p = ggplot(df.query, aes(x = len, fill = s.hits, color = s.hits)) +
   # geom_histogram(aes(y = ..density..), alpha=0.5, color = "black", bins = 30) +
   # geom_jitter(height = 0.02, width = 0, alpha = 0.7) +
   geom_density(alpha = 0.5) +
-  scale_fill_manual(values = my_colors) +
-  scale_color_manual(values = my_colors) +
+  scale_fill_manual(values = colors.blast.hits) +
+  scale_color_manual(values = colors.blast.hits) +
    scale_x_log10() +
   labs(fill = NULL, color = NULL) +
   xlab('length of TEs') + ylab('Normalised density') +
@@ -161,31 +194,18 @@ table(df.query$val.hits)
 
 df = as.data.frame(table(df.query$s.hits))
 
-  
-colors <- c("in graph" = "#676FA3",
-            "partial overlap" = "#FF9F29",
-            "1 self-hit" = "#6EBF8B",
-            "0 hits" = "#D82148",
-            "in graph but not in SVs" = "#151D3B")
-
-
 p = ggplot(df, aes(x = "", y = Freq, fill = Var1)) +
   geom_bar(stat="identity", width=1, alpha = 0.7) +
   coord_polar("y", start=0) +
   labs(title=NULL, fill="Categories") +
   theme_void()+
-    scale_fill_manual(values = colors) +
+    scale_fill_manual(values = colors.blast.hits) +
   geom_text(aes(label = Freq,x = 1.3), position = position_stack(vjust = 0.5)) + theme(legend.position="none")
 p
-
 
 pdf(paste(path.figures, 'tes_self_blast_pie_chart.pdf', sep = ''), width = 3, height = 3)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
-
-
-
-
 
 ```
 
@@ -492,34 +512,34 @@ b.graph.names = network.vertex.names(g.part)
 
 ### New Family colors
 ```{r}
-g.fam.names = sort(unique(g.nodes.fam))
-fam.palette = c()
-idx.pallete = c()
-
-idx.fam <- grep("^Helitron", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#BFACE2', '#266D98', '#422B72'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam <- grep("^LTR", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#BFDB38', '#54B435'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam <- grep("^DNA", g.fam.names, value = FALSE)
-tmp.palette <- colorRampPalette(c('#F9B5D0', '#971549'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-idx.fam = setdiff(1:length(g.fam.names), idx.pallete)
-tmp.palette <- colorRampPalette(c('#FFC26F', '#C38154', '#884A39', '#4E3636'))(length(idx.fam))
-idx.pallete = c(idx.pallete, idx.fam)
-fam.palette = c(fam.palette, tmp.palette)
-
-names(fam.palette) = g.fam.names[idx.pallete]
-fam.palette['Unassigned'] = 'grey'
-fam.palette['Mix'] = 'black'
-fam.palette['TEG'] = 'darkgreen'
+# g.fam.names = sort(unique(g.nodes.fam))
+# fam.palette = c()
+# idx.pallete = c()
+# 
+# idx.fam <- grep("^Helitron", g.fam.names, value = FALSE)
+# tmp.palette <- colorRampPalette(c('#BFACE2', '#266D98', '#422B72'))(length(idx.fam))
+# idx.pallete = c(idx.pallete, idx.fam)
+# fam.palette = c(fam.palette, tmp.palette)
+# 
+# idx.fam <- grep("^LTR", g.fam.names, value = FALSE)
+# tmp.palette <- colorRampPalette(c('#BFDB38', '#54B435'))(length(idx.fam))
+# idx.pallete = c(idx.pallete, idx.fam)
+# fam.palette = c(fam.palette, tmp.palette)
+# 
+# idx.fam <- grep("^DNA", g.fam.names, value = FALSE)
+# tmp.palette <- colorRampPalette(c('#F9B5D0', '#971549'))(length(idx.fam))
+# idx.pallete = c(idx.pallete, idx.fam)
+# fam.palette = c(fam.palette, tmp.palette)
+# 
+# idx.fam = setdiff(1:length(g.fam.names), idx.pallete)
+# tmp.palette <- colorRampPalette(c('#FFC26F', '#C38154', '#884A39', '#4E3636'))(length(idx.fam))
+# idx.pallete = c(idx.pallete, idx.fam)
+# fam.palette = c(fam.palette, tmp.palette)
+# 
+# names(fam.palette) = g.fam.names[idx.pallete]
+# fam.palette['Unassigned'] = 'grey'
+# fam.palette['Mix'] = 'black'
+# fam.palette['TEG'] = 'darkgreen'
 
 
 
@@ -537,6 +557,7 @@ p <- ggnet2(g.part, label = F, edge.color = "black",
             ) 
 p = p + guides(size = F) 
 p = p + coord_fixed(ratio = 1)
+p
 
 
 
@@ -549,7 +570,6 @@ print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
 
 ```
-
 
 
 
@@ -728,89 +748,6 @@ dev.off()
 
 
 ## Dotplots
-#### Functions
-```{r}
-seq2mx <- function(seq, wsize){
-  
-  num_rows <- length(seq) - wsize + 1
-  matrix_seq <- matrix(nrow = num_rows, ncol = wsize)
-  for (i in 1:num_rows) {
-    matrix_seq[i, ] <- seq[i:(i + wsize - 1)]
-  }
-
-  return(matrix_seq)
-}
-
-mxComp <- function(mx1, mx2, wsize, nmatch){
-  mx.res = 0
-  for(s in c('A', 'C', 'G', 'T')){
-    mx.res = mx.res + (mx1 == s) %*% t(mx2 == s)
-  }
-  # mx.res = (mx.res >= nmatch) * 1
-  mx.res[mx.res < nmatch] = 0
-  
-  indices <- which(mx.res != 0, arr.ind = TRUE)
-  values <- mx.res[indices]
-  result <- cbind(indices, values)
-  result = as.data.frame(result)
-  return(result)
-}
-
-dotplot <- function(seq1, seq2, wsize, nmatch) {
-  seq2.rc = rev(seqinr::comp(seq2))
-
-  mx1 = toupper(seq2mx(seq1, wsize))
-  mx2 = toupper(seq2mx(seq2, wsize))
-  
-  result = mxComp(mx1, mx2, wsize, nmatch)
-  
-  mx2.rc = toupper(seq2mx(seq2.rc, wsize))
-  result.rc = mxComp(mx1, mx2.rc, wsize, nmatch)
-  result.rc$values = -result.rc$values
-  result.rc$col = length(seq2) - result.rc$col - wsize + 2
-  result = rbind(result.rc, result)
-  
-  
-  p = ggplot(result, aes(x = row, y = col, fill = values)) +
-    geom_tile(width = 1, height = 1) +
-    # xlab(name1) + ylab(name2) +
-    # xlab(paste0(strsplit(name1, '\\|')[[1]][7:9], collapse = '|')) + 
-    # ylab(paste0(strsplit(name2, '\\|')[[1]][7:9], collapse = '|')) +
-    # xlab('') + ylab('') +
-    guides(fill = FALSE) +
-    theme_minimal() + coord_fixed() +
-    scale_x_continuous(expand = c(0, 0)) + 
-    scale_y_continuous(expand = c(0, 0)) +
-    scale_fill_gradient2(low = "#CE1F6A", mid = "white", high = "#27374D", midpoint = 0) +
-    theme(panel.border = element_rect(colour = "grey", fill=NA, size=1))
-  p 
-  return(p)
-}
-
-
-seqComplexity <- function(seq1, method='dotplot', wsize=10, nmatch=8) {
-
-  mx1 = toupper(seq2mx(seq1, wsize))
-  result = mxComp(mx1, mx1, wsize, nmatch)
-  
-  seq1.rc = rev(seqinr::comp(seq1))
-  mx1.rc = toupper(seq2mx(seq1.rc, wsize))
-  result.rc = mxComp(mx1, mx1.rc, wsize, nmatch)
-  
-  n.match = (nrow(result) + nrow(result.rc)) / length(seq1) 
-  
-  return(p)
-}
-
-```
-
-
-```{r}
-
-p = dotplot(seq1, seq1, wsize, nmatch)
-p
-```
-
 
 ### Read TE sequences
 ```{r}
@@ -995,6 +932,14 @@ sv.se$te = factor(sv.se$te, levels = c('isTE', 'isTEpart', 'hasTE', 'hasTEpart',
 
 ```
 
+## Read SV fasta
+```{r}
+
+sv.seqs = seqinr::read.fasta(paste(path.svs, 'sv_pangen_seq_sv_big.fasta', sep = ''))
+
+```
+
+
 ## Reading nestedness
 ```{r}
 
@@ -1007,6 +952,8 @@ if(!file.exists(file.nestedness)){
   bl.file = paste(path.work, 'sv_big_on_big.txt', sep = '')
   bl.res = read.table(bl.file)
   bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+  
+  bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
 
   res.nest = findNestedness(bl.res, use.strand = F)
     
@@ -1024,6 +971,10 @@ res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)),
 res.nest0 = res.nest
 
 
+# For further analysis of examples:
+bl.file = paste(path.work, 'sv_big_on_big.txt', sep = '')
+bl.res = read.table(bl.file)
+bl.res = bl.res[bl.res$V1 != bl.res$V8,]
 
 ```
 
@@ -1041,9 +992,7 @@ cnt.sv.se
 
 df = reshape2::melt(cnt.sv.se)
 
-te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
-cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
-names(cols) = te.content.names
+
 
 df$Var2 = factor(df$Var2, levels = rev(c('isTE', 'isTEpart', 'hasTE', 'hasTEpart', 'noTE')))
 
@@ -1066,7 +1015,7 @@ p = ggplot(df, aes(x = Var2, y = value, fill = Var2, alpha = Var1, color = Var1)
   scale_pattern_manual(values = c("stripe", 'none'), labels = c("in graph", "not in graph"),
                        breaks = c(TRUE, FALSE)) +
   labs(fill = "", pattern='Connected to others') +
-  scale_fill_manual(values = cols) +
+  scale_fill_manual(values = te.cols) +
   xlab(NULL) +
   ylab("Number of SVs") +
   theme(axis.text.y = element_blank()) + 
@@ -1099,7 +1048,7 @@ cnt.fam.sv = reshape2::melt(cnt.fam.sv)
 
 p = ggplot(cnt.fam.sv, aes(x = Var2, y = Var1, color = Var2)) + 
   geom_point(aes(size = value, alpha = value * 2)) + theme_minimal() + 
-  scale_color_manual(values = cols)  +
+  scale_color_manual(values = te.cols)  +
   geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
               aes(x=Var2, y=Var1, label = round(value, 2)), 
               size = 2.5, color = 'black', 
@@ -1204,8 +1153,8 @@ dev.off()
 ```
 
 
-
-## Filtration
+## Graph
+### Filtration
 ```{r}
 
 res.nest = res.nest0
@@ -1233,7 +1182,7 @@ prefix.mode = c('', '_single')
 ```
 
 
-## Graph
+### Construct
 ```{r}
 # all edges
 idx = res.nest$p1 >= sim.cutoff
@@ -1332,9 +1281,9 @@ g.nodes.fam = nodes.cnt$fam
 names(g.nodes.fam) = nodes.cnt$node
 
 
-g.cols.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
-g.cols = c('#FFD966', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
-names(g.cols) = g.cols.names
+# g.cols.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
+# g.cols = c('#FFD966', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
+# names(g.cols) = g.cols.names
 
 
 g.part <- network(b.graph, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
@@ -1347,12 +1296,12 @@ p <- ggnet2(g.part, label = F, edge.color = "black",
             # mode = 'kamadakawai',
             # arrow.gap = 0, 
             # arrow.size = 3,
-            palette = g.cols) + guides(size = F)
+            palette = te.cols) + guides(size = F)
 p
 
 # path.figures  = '/Volumes/Samsung_T5/vienn/work_te/'
 pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_type.pdf', sep = ''), 
-    width = 5, height = 5)
+    width = 4.6, height = 4.6)
 print(p+ theme(legend.position = "none"))     # Plot 1 --> in the first page of PDF
 dev.off()
 
@@ -1395,12 +1344,13 @@ p = p + theme(legend.text = element_text(size = 8),
 p
 
 
-pdf(paste(path.figures, 'graph_mob_cluster', prefix.mode[singleton.mode+1] ,'_family.pdf', sep = ''), width = 5, height = 5)
+pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_family.pdf', sep = ''), 
+    width = 4.6, height = 4.6)
 print(p+ theme(legend.position = "none"))     # Plot 1 --> in the first page of PDF
 dev.off()
 
 
-pdf(paste(path.figures, 'graph_mob_cluster', prefix.mode[singleton.mode+1] ,'_family_legend.pdf', sep = ''), width = 7, height = 5)
+pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_family_legend.pdf', sep = ''), width = 7, height = 5)
 print(p+ coord_fixed(ratio = 1))     # Plot 1 --> in the first page of PDF
 dev.off()
 
@@ -1461,7 +1411,7 @@ p <- ggnet2(g.part.sub.big, label = F, edge.color = "black",
             node.size = g.nodes.cnt[b.graph.names.sub.big], 
             color = g.nodes.type[b.graph.names.sub.big],
             mode = 'kamadakawai',
-            palette = g.cols) + guides(size = F)
+            palette = te.cols) + guides(size = F)
 p.big.type = p + theme(legend.position = "none")
 
 set.seed(20)
@@ -1487,7 +1437,7 @@ p <- ggnet2(g.part.sub.small, label = F, edge.color = "black",
             node.size = g.nodes.cnt[b.graph.names.sub.small], 
             color = g.nodes.type[b.graph.names.sub.small],
             # mode = 'kamadakawai',
-            palette = g.cols) + guides(size = F)
+            palette = te.cols) + guides(size = F)
 p.small.type =p + theme(legend.position = "none")
 
 set.seed(20)
@@ -1509,14 +1459,15 @@ p.small.color = p + theme(legend.position = "none")
 # p.small.type
 # p.small.color
 
+size.units = 4.6
 
 pdf(paste(path.figures, 'graph_mob_big_cluster', prefix.mode[singleton.mode+1] ,'_type.pdf', sep = ''), 
-    width = 5, height = 5)
+    width = size.units, height = size.units)
 print(p.big.type)     # Plot 1 --> in the first page of PDF
 dev.off()
 
 pdf(paste(path.figures, 'graph_mob_big_cluster', prefix.mode[singleton.mode+1] ,'_family.pdf', sep = ''), 
-    width = 5, height = 5)
+    width = size.units, height = size.units)
 print(p.big.color)     # Plot 1 --> in the first page of PDF
 dev.off()
 
@@ -1534,6 +1485,271 @@ dev.off()
 
 ```
 
+
+## Examples with big "has TE"
+```{r}
+
+path.components = paste(path.figures, 'components/', sep = '')
+if (!dir.exists(path.components)) {
+  dir.create(path.components)
+}
+
+# Find a big node, whish is "Have te", which which is not in the biggest connected component
+
+nodes.havete.big = nodes.cnt$node[(nodes.cnt$cnt >= 7) & ((nodes.cnt$type == 'hasTE') | (nodes.cnt$type == 'hasTEpart'))]
+nodes.havete.big = nodes.havete.big[nodes.havete.big %in% names(tmp.comp$membership)]
+
+
+nodes.target = unique(nodes.havete.big[tmp.comp$membership[nodes.havete.big] != as.numeric(names(tmp.cnt)[1])])
+
+# for(i.target in 1:min(80, length(nodes.target))){
+for(i.target in c(1)){
+  message(i.target)
+  
+  comp.target = as.numeric(tmp.comp$membership[nodes.target[i.target]])
+  
+  # Visualise one component
+  
+  tmp.k = comp.target
+  tmp.names = names(tmp.comp$membership)[tmp.comp$membership == tmp.k]
+  b.graph.sub = b.graph[(b.graph[,1] %in% tmp.names) | 
+                          (b.graph[,2] %in% tmp.names),,drop=F]
+  
+  g.part.sub.big <- network(b.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+  b.graph.names.sub.big = network.vertex.names(g.part.sub.big)
+  
+  
+  set.seed(20)
+  p.te <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+              node.size = g.nodes.cnt[b.graph.names.sub.big], 
+              color = g.nodes.type[b.graph.names.sub.big],
+              mode = 'kamadakawai',
+              arrow.gap = 0.04, arrow.size = 5,
+              palette = te.cols) + guides(size = F)+ theme(legend.position = "none")
+  
+  
+  set.seed(20)
+  p.fam <- ggnet2(g.part.sub.big, label = g.nodes.cnt[b.graph.names.sub.big], edge.color = "black", 
+              node.size = g.nodes.cnt[b.graph.names.sub.big],
+              # node.size = 10, 
+              color = g.nodes.fam[b.graph.names.sub.big],
+              mode = 'kamadakawai',
+              arrow.gap = 0.04, arrow.size = 5,
+              palette = fam.palette) + guides(size = F)+ theme(legend.position = "none")
+  
+  pp = ggarrange(p.te, p.fam, nrow=1)
+  
+  # pp
+  
+  # TODO: third plot - frequency plot (three of colors: insertion, deletion, indel)
+  
+  pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.target),'.pdf', sep = ''), 
+      width = 6, height = 3)
+  print(pp)     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+}
+
+
+
+```
+### Get sequences and align
+```{r}
+
+path.mafft = paste(path.work, 'mafft/', sep = '')
+if (!dir.exists(path.mafft)) {
+  dir.create(path.mafft)
+}
+  
+sv.name.target = nodes$te[nodes$node %in% tmp.names]
+
+seqs.target = sv.seqs[sv.name.target]
+seqs.target.len = as.numeric(sapply(names(seqs.target), function(s) strsplit(s, '\\|')[[1]][2]))
+seqs.target = seqs.target[order(-seqs.target.len)]
+sv.name.target = names(seqs.target)
+
+# Find orientations of sequences
+
+
+bl.target = bl.res[(bl.res$V1 %in% sv.name.target) & (bl.res$V8 %in% sv.name.target),]
+orientation.target = rep('.', length(seqs.target))
+names(orientation.target) = sv.name.target
+orientation.target[1] = '+'
+
+# TODO: define the first orientation by the longest ORF
+
+dir.seq = c('-', '+')
+
+for(i in 1:(length(orientation.target) - 1)){
+  bl.tmp = bl.target[bl.target$V1 == sv.name.target[i],]
+  bl.tmp = bl.tmp[order(-bl.tmp$V7),]
+  bl.tmp = bl.tmp[!duplicated(bl.tmp$V8),]
+  bl.tmp$dir = bl.tmp$V5 > bl.tmp$V4
+  bl.tmp = bl.tmp[orientation.target[bl.tmp$V8] == '.',]
+  if(nrow(bl.tmp) == 0) next
+  
+  if(orientation.target[i] == '+'){
+    orientation.target[bl.tmp$V8] = dir.seq[1 + (bl.tmp$dir) * 1]
+  }
+  
+  if(orientation.target[i] == '-'){
+    orientation.target[bl.tmp$V8] = dir.seq[2 - (bl.tmp$dir) * 1]
+  }
+  
+  if(sum(orientation.target == '.') == 0) break
+}
+# 
+for(i in which(orientation.target == '-')){
+  seqs.target[[i]] = rev(seqinr::comp(seqs.target[[i]]))
+}
+
+seqs.target.msa = unlist(lapply(seqs.target, function(s) paste0(s, collapse = '')))
+seqs.target.msa <- DNAStringSet(seqs.target.msa)
+
+# alignment <- msa(seqs.target.msa)
+
+
+
+# Run the alignment
+tmp.fasta = paste(path.mafft, 'tmp.fasta', sep = '')
+aln.fasta = paste(path.mafft, 'aln.fasta', sep = '')
+writeXStringSet(seqs.target.msa, filepath = tmp.fasta)
+
+system(paste('mafft --op 5 --quiet --maxiterate 100 ', tmp.fasta, '>', aln.fasta,  sep = ' '))
+
+alignment = readDNAStringSet(aln.fasta)
+
+seqs.mx = as.matrix(alignment)
+msaplot(seqs.mx)
+
+```
+
+### Alignment step-by step
+```{r}
+# Align all sequences within each node
+
+# sv.name.target = nodes$te[nodes$node %in% tmp.names]
+
+aln.nodes = list()
+seqs.all.cons = c()
+for(s.node in tmp.names){
+  sv.name.node = nodes$te[nodes$node %in% s.node]
+  seqs.name.node = seqs.target.msa[sv.name.node]
+  
+  if(length(sv.name.node) == 1){
+    seqs.mx = as.matrix(seqs.name.node)
+    aln.nodes[[s.node]] = seqs.mx
+    seqs.all.cons[s.node] = as.character(seqs.name.node)
+    next
+  }
+  
+  tmp.fasta = paste(path.mafft, 'tmp.fasta', sep = '')
+  aln.fasta = paste(path.mafft, 'aln.fasta', sep = '')
+  writeXStringSet(seqs.name.node, filepath = tmp.fasta)
+  
+  system(paste('mafft --op 5 --quiet --maxiterate 100 ', tmp.fasta, '>', aln.fasta,  sep = ' '))
+  
+  alignment = readDNAStringSet(aln.fasta)[sv.name.node]
+  seqs.mx = as.matrix(alignment)
+  # msaplot(seqs.mx)
+  
+  # add consensus sequence
+
+  cons.prof = seqinr::consensus(seqs.mx, method = 'profile')
+  cons.prof = cons.prof[!(rownames(cons.prof) == '-'),]
+  max.indexes <- apply(cons.prof, 2, which.max)
+  cons.seq = rownames(cons.prof)[max.indexes]
+  # seqs.mx = rbind(seqs.mx, cons.seq)
+  
+  aln.nodes[[s.node]] = seqs.mx
+  seqs.all.cons[s.node] = paste0(cons.seq, collapse = '')
+}
+
+# Combine all seqs for the alignment
+ 
+# Align consensuses
+seqs.all.cons <- DNAStringSet(seqs.all.cons)
+
+# Run the alignment
+tmp.fasta = paste(path.mafft, 'tmp.fasta', sep = '')
+aln.fasta = paste(path.mafft, 'aln.fasta', sep = '')
+writeXStringSet(seqs.all.cons, filepath = tmp.fasta)
+
+system(paste('mafft --op 5 --quiet --maxiterate 100 ', tmp.fasta, '>', aln.fasta,  sep = ' '))
+
+alignment = readDNAStringSet(aln.fasta)
+
+seqs.mx.cons = as.matrix(alignment)
+msaplot(seqs.mx.cons)
+
+# Combine consensuses back
+seqs.mx.complete = c()
+for(s.node in rownames(seqs.mx.cons)){
+  aln.tmp = aln.nodes[[s.node]]
+  mx.tmp = matrix('-', nrow = nrow(aln.tmp), ncol = ncol(seqs.mx.cons), dimnames = list(rownames(aln.tmp), NULL))
+  mx.tmp[, seqs.mx.cons[s.node,] != '-'] = aln.tmp
+  seqs.mx.complete = rbind(seqs.mx.complete, mx.tmp)
+}
+
+p.msa = msaplot(seqs.mx.complete[sv.name.target,])
+# p.msa = msaplot(seqs.mx.complete)
+p.msa
+
+
+pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.target),'_msa.pdf', sep = ''), 
+    width = 6, height = 4)
+print(p.msa)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+### Create graph from without node collapse
+```{r}
+
+
+
+```
+
+
+
+
+```{r}
+s = rownames(seqs.mx)
+
+s1 = as.character(as.vector(seqs.target.msa[[1]]))
+s2 = as.character(as.vector(seqs.target.msa[[4]]))
+dotplot(s1, s2, 10, 9)
+
+```
+
+
+```{r}
+
+s1 = as.character(as.vector(seqs.target.msa[['SVgr_1_id_122936|638']]))
+s2 = as.character(as.vector(seqs.target.msa[["SVgr_5_id_136083|674"]]))
+dotplot(s1, s2, 10, 8)
+
+
+bl.target[(bl.target$V1 %in% s.tmp) & (bl.target$V8 %in% s.tmp), ]
+
+```
+
+
+```{r}
+
+s1 = as.character(as.vector(seqs.target.msa[[1]]))
+s2 = as.character(as.vector(seqs.target.msa[[4]]))
+dotplot(s1, s2, 10, 8)
+
+
+s2 = as.character(seqs.target.msa[[1]])
+# todo: %ORF
+```
+
+
+# Stop
+```{r}
+stop('All graphs are created, Stop before the code for \"per accession\" ')
+```
 
 
 
@@ -1614,12 +1830,6 @@ sv.annot[extracted_values,]
 ```
 
 
-
-
-# Stop
-```{r}
-stop()
-```
 
 
 # Big TE-nodes
@@ -1790,7 +2000,7 @@ p <- ggnet2(g.part, label = F, edge.color = "black",
             node.size = 1,
             # node.size = g.nodes.cnt[b.graph.names], 
             # color = g.nodes.type[b.graph.names],
-            # palette = g.cols
+            # palette = te.cols
             ) + guides(size = F)
 p 
 
@@ -1825,23 +2035,6 @@ for(type in types){
 g.nodes.prot = sv.memb$prot
 g.nodes.prot[g.nodes.prot == 'disease'] = 'defined prot'
 names(g.nodes.prot) = sv.memb$name
-
-g.cols = discrete_rainbow(length(unique(sv.memb$prot)))
-names(g.cols) = unique(sv.memb$prot)
-# names(g.cols) = c('no prot', "undefined prot", "reverse", "transpos","repeat","zinc", "receptor","defined prot")
-
-g.cols['disease'] = 'black'
-# g.cols['defined prot'] = '#F0B86E'
-# g.cols['repeat'] = '#CAE0AB'
-# g.cols['zink'] = '#1A5D1A'
-# g.cols['receptor'] = '#ED7B7B'
-
-g.cols['zinc'] = '#F45050'
-g.cols['repeat'] = '#EA906C'
-g.cols['receptor'] = '#F7D060'
-
-g.cols['reverse'] = '#98D8AA'
-g.cols['defined prot'] = '#7BAFDE'
 
 
 
