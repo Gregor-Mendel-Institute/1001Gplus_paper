@@ -200,7 +200,6 @@ refineDirectEdges <- function(edges.compact, echo = T){
   
   # Refine each connected component
   g.comp <- igraph::components(g)
-  
   edges.polised = c()
   for(i.comp in 1:g.comp$no){
     # message(i.comp)

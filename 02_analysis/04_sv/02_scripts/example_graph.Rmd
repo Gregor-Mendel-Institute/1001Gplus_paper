@@ -37,6 +37,10 @@ bl.file = 'example_graph_5comp.txt'
 bl.res = read.table(bl.file, stringsAsFactors = F)
 
 i.len.field = 5
+# This is a name:
+# te|4329877|4334393|1|4517|+|AT1TE14085|ATMU4|DNA/MuDR
+# length is at the "5"-th field = 4517;
+# therefore i.len.field = 5
 
 ```
 
