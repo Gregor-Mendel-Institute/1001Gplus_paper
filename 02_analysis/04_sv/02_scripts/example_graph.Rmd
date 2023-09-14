@@ -40,6 +40,7 @@ i.len.field = 5
 
 ```
 
+
 # Graph construction
 ## Whole graph
 ```{r}
@@ -58,7 +59,6 @@ p.init <- ggnet2(g.part, label = F, edge.color = "black",
             # mode = "kamadakawai"
             )
 ```
-
 
 ## Refined graph
 ```{r}

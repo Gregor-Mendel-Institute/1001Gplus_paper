@@ -172,6 +172,7 @@ refineDirectEdges <- function(edges.compact, echo = T){
   g = igraph::make_graph(t(edges.compact), directed = TRUE)
   E(g)$name <- paste(edges.compact[,1], edges.compact[,2], sep = '-')
   
+  # Find nodes, which should be kept with all their edges and delete them from the graph
   nodes.keep = c()
   n.nodes.keep = -1
   while(length(nodes.keep) != n.nodes.keep){
@@ -190,44 +191,54 @@ refineDirectEdges <- function(edges.compact, echo = T){
     g <- delete_vertices(g, tails)
   }
   
-  
-  # Remove components with size 1
+  # Remove connected components with size 1 and keep node names
   g.comp <- igraph::components(g)
   id.single = which(g.comp$csize == 1)
   nodes.single = names(g.comp$membership)[g.comp$membership %in% id.single]
   nodes.keep = c(nodes.keep, nodes.single)
   g <- delete_vertices(g, nodes.single)
   
+  # Refine each connected component
+  g.comp <- igraph::components(g)
   
   edges.polised = c()
-  g.comp <- igraph::components(g)
   for(i.comp in 1:g.comp$no){
     # message(i.comp)
+    
+    # Get subgraph
     names.comp = names(g.comp$membership)[g.comp$membership == i.comp]
     g.sub <- induced_subgraph(g, names.comp)
     
     # print(c(vcount(g.sub), ecount(g.sub)))
     # ggigraph(g.sub)
     
+    # Find all nodes, which have "out" degree != 0.
+    # TODO: change to >= 2 and check.
     deg.out <- igraph::degree(g.sub, mode = "out")
     targets = names(deg.out)[deg.out != 0]  
     edges.sub =  get.edgelist(g.sub)
     
+    # Find all destinations of these nodes: (target) -> (out1)
     idx.target = edges.sub[,1] %in% targets
     out1 = edges.sub[idx.target, 2]
-    out1.comb = paste(edges.sub[idx.target, 1], edges.sub[idx.target, 2], sep = '_')
+    out1.comb = paste(edges.sub[idx.target, 1], edges.sub[idx.target, 2], sep = '_')  # create "target_out1"
     
+    # Find second-layer destinations: (out1) -> (out2)
     idx.out1 = which(edges.sub[,1] %in% unique(out1))
     out2 = tapply(edges.sub[idx.out1,2], edges.sub[idx.out1,1], function(x) list(x))
     
+    # Connect second-layer destinations to the initial targets: (target) -> (out1) -> (out2)
     out12 = out2[out1]
     names(out12) = paste(edges.sub[idx.target, 1], '_', out1, '_', sep = '')
     
+    # Remove the intermediate subname: change "target_out1_out2" into "target_out2"
     out12 = unlist(out12)
     out12.pref = sub("_.*", "", names(out12))
     out2.comb = paste(out12.pref, out12, sep = '_')
     
-    out.common = intersect(out1.comb, out2.comb)
+    # Find edges, which exist twice..
+    out.common = intersect(out1.comb, out2.comb)  # intersect "target_out1" and "target_out2"
+    # .. and remove these edges
     if(length(out.common) != 0){
       edges.delete <- as.matrix(data.frame(do.call(rbind, strsplit(out.common, "_"))))
       
@@ -254,11 +265,12 @@ refineDirectEdges <- function(edges.compact, echo = T){
     # ggigraph(g.sub, label = F)
     # ggigraph(g.sub)
     
+    # Save
     edges.sub = get.edgelist(g.sub)
-    
     edges.polised = rbind(edges.polised, edges.sub)
   }
   
+  # Add all edges for nodes, which were kept before
   edges.add = edges.compact[(edges.compact[,1] %in% nodes.keep) | (edges.compact[,2] %in% nodes.keep), ]
   edges.final = rbind(edges.polised, edges.add)
   return(edges.final)
