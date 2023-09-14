@@ -143,7 +143,7 @@ getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collap
   table(nodes.traits$cnt[!nodes.traits$in.graph])
   
   if(refine){
-    cat('Find Nestedness...')
+    cat('Refine...')
     edges.compact = refineDirectEdges(edges.compact, echo = F)
     cat(' done!\n')
   }

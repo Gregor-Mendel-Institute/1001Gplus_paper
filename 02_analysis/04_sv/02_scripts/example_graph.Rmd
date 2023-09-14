@@ -9,8 +9,6 @@ taking into account counts of the "same" sequences (sim.cutoff).
 
 # Setup
 ```{r, message=FALSE}
-# library(ggplot2)
-# library(reshape2)
 library(viridis)
 library(colorRamps)
 library(gridExtra)
