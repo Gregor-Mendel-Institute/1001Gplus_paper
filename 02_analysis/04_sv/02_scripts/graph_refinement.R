@@ -65,6 +65,20 @@ getGraphComponents <- function(edges){
 #' 
 #' @param i.len.field index for the field, where you see the length of the sequence in names
 #' @param collapse a boolean value indicating whether to collapse sequences with mutual similarity into nodes (default is TRUE).
+#' @param refine An indicating whether to refine the graph (default is TRUE).
+#' Example list of edges:
+#' (1) -> (2)
+#' (2) -> (3)
+#' (1) -> (3)
+#' 
+#' The edge (1) -> (3) should de removed, because path (1) -> (2) -> (3) exists.
+#'
+#' @param min.length The minimum sequence length to be included in the graph (default is 0).
+#' @param max.length The maximum sequence length to be included in the graph (default is Inf).
+#'
+#' @param return.nest An indicating whether to return the initial nestedness to create the graph (default is FALSE).
+#' 
+#' @param echo An indicating whether to print progress messages steps (default is TRUE).
 #'
 #' @return The graph represented as the list with the following components:
 #'   \itemize{
@@ -73,34 +87,52 @@ getGraphComponents <- function(edges){
 #'     \item{node.traits}{A data frame representing traits associated with nodes.}
 #'   }
 #' 
-getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collapse = T, refine = T){
+getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, 
+                              collapse = T, refine = T,
+                              min.length = 0,
+                              max.length = Inf,
+                              return.nest = F,
+                              echo = T){
   
   # nestedness
   bl.res = bl.res[bl.res$V1 != bl.res$V8,]
   bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
   
-  cat('Find Nestedness...')
-  res.nest = findNestedness(bl.res, use.strand = F)
-  cat(' done!\n')
-  
-  # optimised length definition
-  res.nest.len = sapply(unique(c(res.nest$V1, res.nest$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
+  # Length of sequences (optimised approach)
+  res.nest.len = sapply(unique(c(bl.res$V1, bl.res$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
   if(sum(is.na(res.nest.len)) != 0){
     stop(paste('Be careful with extracting sequence lengths.\n',
                'It a positionsl information in their names.\n',
                'Current length slot is ', i.len.field, sep = ''))
   }
+  # lengths are different from the default
+  arg.defaults <- formals(sys.function(sys.nframe()))
+  if((min.length != arg.defaults$min.length) | (max.length != arg.defaults$max.length)){
+    message(paste('New lengths', min.length, max.length))
+    res.nest.len = res.nest.len[res.nest.len >= min.length]
+    res.nest.len = res.nest.len[res.nest.len <= max.length]
+    bl.res = bl.res[bl.res$V1 %in% names(res.nest.len),]
+    bl.res = bl.res[bl.res$V8 %in% names(res.nest.len),]
+  }
   
+  # Find nestedness
+  cat('Find Nestedness...')
+  res.nest = findNestedness(bl.res, use.strand = F)
+  cat(' done!\n')
+  
+
+  # Gen lengths
   res.nest$len1 = res.nest.len[res.nest$V1]
   res.nest$len8 = res.nest.len[res.nest$V8]
   res.nest$p1 = res.nest$C1 / res.nest$len1
   res.nest$p8 = res.nest$C8 / res.nest$len8
   
+  
   # Remain only those blast hits, which satisfy sim.cutoff
   res.nest.sim = res.nest[(res.nest$p1 >= sim.cutoff) | 
                             (res.nest$p8 >= sim.cutoff),]
   
-  # get edges of coverage: (1) -> (2), i.e. (1) is covered by (2)
+  # get edges of nestedness: (1) -> (2), i.e. (1) is covered by (2)
   idx.1.to.2 = res.nest$p1 >= sim.cutoff
   edges = cbind(res.nest$V1[idx.1.to.2], res.nest$V8[idx.1.to.2])
   idx.2.to.1 = res.nest$p8 >= sim.cutoff
@@ -108,6 +140,9 @@ getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collap
   
   if(!collapse){
     res.list = list(edges = edges, nodes = c(), nodes.traits = c())
+    if(return.nest){
+      res.list[['nestedness']] = res.nest
+    }
     return(res.list)
   }
   
@@ -139,7 +174,7 @@ getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collap
   
   nodes.traits$in.graph = nodes.traits$node %in% c(edges.compact)
   
-  # Some sequences are thr same, but do not form any unmutual mestedness,so no edges in the graph
+  # Some sequences are the same, but do not form any unmutual nestedness,so no edges in the graph
   table(nodes.traits$cnt[!nodes.traits$in.graph])
   
   if(refine){
@@ -149,6 +184,9 @@ getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, collap
   }
   
   res.list = list(edges = edges.compact, nodes = nodes, nodes.traits = nodes.traits)
+  if(return.nest){
+    res.list[['nestedness']] = res.nest
+  }
   return(res.list)
   
 }
