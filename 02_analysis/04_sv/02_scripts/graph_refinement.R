@@ -34,6 +34,34 @@ ggedges <- function(edges.linear, label = F, size = 5){
   return(p)
 }
 
+
+#' Give traits to nodes based on traits of sequences
+#'
+#' This function measures cumulative traits for nodes based sequences withint the node.
+#' If traits are not unique - returns "Mix"
+#'
+#' @param nodes A data frame containing node information.
+#' @param seqs.trait A vector containing the traits for sequences. 
+#' Names of sequences sould be correct!
+#' @param explain.mix An indicator to extend "Mix" annotation
+#' 
+#' @return A vector containing the trait for each node.
+#' 
+traitsSeqToNode <- function(nodes, seqs.trait, explain.mix = F){
+  nodes.trait = sapply(nodes$node, function(s){
+    s.seq = nodes$name[nodes$node == s]
+    traits.tmp = unique(seqs.trait[s.seq])
+    if(length(traits.tmp) == 1){
+      return(traits.tmp)
+    } else if (explain.mix){
+      return(paste('Mix:', paste(sort(traits.tmp), sep = ','), sep = ''))
+    } else {
+      return('Mix')
+    }
+  })
+  return(nodes.trait)
+}
+
 #' Get connected components of a directed graph
 #'
 #' This function takes a set of directed edges and calculates the connected
