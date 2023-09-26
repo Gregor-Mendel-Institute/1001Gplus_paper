@@ -32,7 +32,7 @@ chr.color = '#176B87'
 ```
 
 
-
+## Own coordinates
 ```{r}
 
 file = paste(path.data, 'athal_genic_nongenic_all_pi_300kb_pi.txt', sep = '')
@@ -44,8 +44,10 @@ for(i.chr in 1:5){
   cep.pos.chr = cep.pos[cep.pos$chromosome == paste('Chr', i.chr, sep = ''),]
   
   p = ggplot(pi.chr, aes(x = window_pos_1, y = avg_pi)) + 
+    annotate(geom = "rect",xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf,
+           fill = '#F4F1D7', alpha = 0.5) +
     annotate(geom = "rect",xmin = cep.pos.chr$start2, xmax = cep.pos.chr$stop2, ymin = -Inf, ymax = Inf,
-           fill = chr.color, alpha = 0.2) +
+           fill = '#9AC5C7', alpha = 0.2) +
     annotate(geom = "rect",xmin = cep.pos.chr$start3, xmax = cep.pos.chr$stop3, ymin = -Inf, ymax = Inf,
            fill = chr.color, alpha = 0.2) +
     annotate(geom = "rect",xmin = cep.pos.chr$start, xmax = cep.pos.chr$stop, ymin = -Inf, ymax = Inf,
@@ -69,4 +71,130 @@ for(i.chr in 1:5){
 
 
 ```
+
+## Pandenome coordinates
+```{r}
+
+file = paste(path.data, 'athal_genic_nongenic_all_pi_300kb_pangencoord_pi.txt', sep = '')
+pi.all = read.table(file, stringsAsFactors = F, header = 1)
+
+i.chr = 1
+for(i.chr in 1:5){
+# cen.breaks.chr = cen.breaks[cen.breaks$chr == i.chr,]
+  pi.chr = pi.all[pi.all$chromosome == paste('Chr', i.chr, sep = ''),]
+  cep.pos.chr = cep.pos[cep.pos$chromosome == paste('Chr', i.chr, sep = ''),]
+  
+  p = ggplot(pi.chr, aes(x = window_pos_1, y = avg_pi)) + 
+    # annotate(geom = "rect",xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf,
+    #        fill = '#F4F1D7', alpha = 0.5) +
+    # annotate(geom = "rect",xmin = cep.pos.chr$start2, xmax = cep.pos.chr$stop2, ymin = -Inf, ymax = Inf,
+    #        fill = '#9AC5C7', alpha = 0.2) +
+    # annotate(geom = "rect",xmin = cep.pos.chr$start3, xmax = cep.pos.chr$stop3, ymin = -Inf, ymax = Inf,
+    #        fill = chr.color, alpha = 0.2) +
+    # annotate(geom = "rect",xmin = cep.pos.chr$start, xmax = cep.pos.chr$stop, ymin = -Inf, ymax = Inf,
+    #        fill = chr.color, alpha = 0.5) +
+    geom_line(size = 1) +
+    # geom_point(size = 1) +
+    theme_minimal() + 
+    ylab(expression(pi)) + xlab('TAIR10 Cromosome position') +
+    scale_x_continuous(expand = c(0, 0), breaks = seq(0,30,5)*1000000, labels = paste(seq(0,30,5), 'M', sep = '')) +
+    scale_y_continuous(expand = c(0.05, 0)) +
+    theme( panel.border = element_rect(colour = "grey70", fill=NA, size=1),
+           panel.grid.minor = element_blank()) 
+  p 
+
+  pdf(paste(path.figures, 'fig_pi_diversity_chr',i.chr,'_pangen.pdf', sep = ''), width = 7, height = 1.2)
+  print(p)     # Plot 1 --> in the first page of PDF
+  dev.off()
+  
+}
+
+
+```
+
+
+# My-pi
+```{r}
+
+snps = readRDS('/Volumes/Samsung_T5/vienn/work_snps/snps_all.rds')
+snps[is.na(snps)] = -1
+
+nrow(snps)
+
+pos = as.numeric(stringr::str_extract(rownames(snps), "(?<=_\\d_)(\\d+)"))
+
+
+pos = do.call(rbind, strsplit(rownames(snps), "_"))
+pos <- as.data.frame(pos, stringsAsFactors = FALSE)
+pos$V2 = as.numeric(pos$V2)
+pos$V3 = as.numeric(pos$V3)
+
+pos$ref = rowSums(snps == 0)
+pos$alt = rowSums(snps == 2)
+pos$n = pos$ref + pos$alt 
+pos$ref = pos$ref / pos$n 
+pos$alt = pos$alt / pos$n 
+
+pos$pi = pos$ref * pos$alt
+
+# 
+# ggplot(pos[pos$V2 == 2,], aes(x = V3, y = pi)) + 
+#   geom_point(alpha = 0.5)
+  
+
+hist(pos[pos$V2 == 1,]$V3, 1000)
+
+```
+
+
+## Pangenome coordinates
+```{r}
+
+pos.corresp = readRDS('/Volumes/Samsung_T5/vienn/work_snps/tmp_pos_corresp_chr1.rds')
+pos.corresp = cbind(pos.corresp, 1:length(pos.corresp))
+pos.corresp = pos.corresp[pos.corresp[,1] != 0,]
+pos.corresp = rbind(pos.corresp, cbind(setdiff(1:max(pos.corresp[,1]), pos.corresp[,1]), 0))
+
+dim(pos.corresp)
+
+pos.corresp = pos.corresp[order(pos.corresp[,1]),]
+
+
+pos$pan[pos$V1 == 1] = pos.corresp[pos$V3[pos$V1 == 1],2]
+
+
+hist(pos[pos$V2 == 1,]$V3, 10000)
+hist(pos[pos$V2 == 1,]$pan, 10000)
+
+```
+
+## Pi "between" two parts
+```{r}
+
+seq1 = sample(1:28, 14)
+seq2 = setdiff(1:28, seq1)
+p1 = rowSums(snps[,seq1] == 0)
+p2 = rowSums(snps[,seq2] == 0)
+
+
+p.bw = ((p1 == 14) & (p2 != 14)) | ((p2 == 14) & (p1 != 14))
+
+hist(pos[(pos$V2 == 1) & p.bw,]$V3, 10000)
+
+
+```
+
+## Private pi
+```{r}
+
+p0 = rowSums(snps == 0)
+p.mut = rowSums(snps == 2)
+
+p.private = (p0 == 27) & (p.mut == 1)
+
+
+hist(pos[(pos$V2 == 1) & p.private,]$pan, 1000)
+
+```
+
 
