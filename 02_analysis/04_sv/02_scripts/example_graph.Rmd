@@ -146,7 +146,7 @@ path.jilong = '/Users/anna/Library/CloudStorage/OneDrive-Personal/vienn/jilong/'
 bl.file = paste(path.jilong, 'blast_to_anna.txt', sep = '')
 bl.res = read.table(bl.file, stringsAsFactors = F)
 
-sim.cutoff = 0.95
+sim.cutoff = 0.85
 i.len.field = 7
 
 # Run nestedness
@@ -165,14 +165,15 @@ g.content$nodes.traits$species = new.trait[g.content$nodes.traits$node]
 # Define colors
 colors.trait = discrete_rainbow(length(unique(new.trait)))
 names(colors.trait) = unique(new.trait)
+colors.trait['Mix'] = 'blue'
 
 # plot
 g.part <- network(g.content$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
 b.graph.names = network.vertex.names(g.part)
 set.seed(239)
 p.refined <- ggnet2(g.part, label = F, edge.color = "black",
-            # node.size = g.nodes.cnt[b.graph.names],
-            node.size = 0.1,
+            node.size = g.content$nodes.traits[b.graph.names,]$cnt,
+            # node.size = 0.1,
             # color = '#468B97',
             arrow.gap = 0.01, arrow.size = 2,
             color = new.trait[b.graph.names],
