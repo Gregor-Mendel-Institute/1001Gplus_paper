@@ -23,7 +23,7 @@ library(ggpubr)
 library(Biostrings)
 
 source('similarity.R')
-source('seqdotplot.R')
+source('dotplot.R')
 source('msaplot.R')
 
 sunset <- colour("sunset")
@@ -49,6 +49,7 @@ sim.cutoff = 0.85
 te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
 te.cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
 names(te.cols) = te.content.names
+te.cols['Mix'] = 'grey20'
 
 
 # ---- Colors of BLAST hits ----
@@ -96,6 +97,11 @@ g.cols['receptor'] = '#F7D060'
 g.cols['reverse'] = '#98D8AA'
 g.cols['defined prot'] = '#7BAFDE'
 
+
+
+# Colors for indels
+
+indel.pallete = c("I"='black', "M"='grey40', "D"='grey70')
 
 
 ```
@@ -980,6 +986,8 @@ bl.res = bl.res[bl.res$V1 != bl.res$V8,]
 
 
 ## TE stat
+
+
 ### In graph - not in graph
 ```{r}
 res.nest = res.nest0
@@ -1047,7 +1055,9 @@ cnt.fam.sv = cnt.fam.sv[, colSums(cnt.fam.sv) != 0]
 cnt.fam.sv = reshape2::melt(cnt.fam.sv)
 
 p = ggplot(cnt.fam.sv, aes(x = Var2, y = Var1, color = Var2)) + 
-  geom_point(aes(size = value, alpha = value * 2)) + theme_minimal() + 
+  geom_point(aes(size = value, 
+                 alpha = value * 2
+                 )) + theme_minimal() + 
   scale_color_manual(values = te.cols)  +
   geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
               aes(x=Var2, y=Var1, label = round(value, 2)), 
@@ -1153,197 +1163,139 @@ dev.off()
 ```
 
 
-## Graph
+## Graph visualisation
+
+```{r}
+source('graph_refinement.R')
+
+sv.graph = getGraphFromBlast(res.nest=res.nest, 
+                             sim.cutoff = sim.cutoff,
+                             collapse = T)
+
+sv.graph.full = getGraphFromBlast(res.nest=res.nest, 
+                             sim.cutoff = sim.cutoff,
+                             collapse = F)
+
+sv.graph$nodes$type = setNames(sv.se$te, sv.se$name)[sv.graph$nodes$name]
+sv.graph$nodes$fam = setNames(sv.se$fam, sv.se$name)[sv.graph$nodes$name]
+sv.graph$nodes$freq = setNames(sv.se$freq.max, sv.se$name)[sv.graph$nodes$name]
+
+sv.graph$nodes.traits$type <- traitsSeqToNode(sv.graph$nodes, 
+                                              sv.graph$nodes$type,
+                                              mode = 'maxunique'
+                                              )[sv.graph$nodes.traits$node]
+sv.graph$nodes.traits$fam <- traitsSeqToNode(sv.graph$nodes[sv.graph$nodes$fam != '',], 
+                                              sv.graph$nodes$fam[sv.graph$nodes$fam != ''],
+                                              mode = 'maxunique'
+                                              )[sv.graph$nodes.traits$node]
+
+sv.graph$nodes.traits$freq <- round(traitsSeqToNode(sv.graph$nodes, 
+                                              sv.graph$nodes$freq,
+                                              mode = 'mean'
+                                              )[sv.graph$nodes.traits$node])
+
+
+# indels
+sv.se$freq = sv.se$freq.max
+n.cutoff = 3
+n = 28
+sv.se$sin = 'M'
+sv.se$sin[sv.se$freq >= (n - n.cutoff)] = 'D'
+sv.se$sin[sv.se$freq <= n.cutoff] = 'I'
+
+
+sv.graph$nodes$indel = setNames(sv.se$sin, sv.se$name)[sv.graph$nodes$name]
+
+sv.graph$nodes.traits$indel <- traitsSeqToNode(sv.graph$nodes, 
+                                              sv.graph$nodes$indel,
+                                              mode = 'unique',
+                                              explain.mix = F,
+                                              mix.word = 'M'
+                                              )[sv.graph$nodes.traits$node]
+
+```
+
+
+
+
 ### Filtration
 ```{r}
 
-res.nest = res.nest0
 
-sv.names.mix = sv.se$name[grep("^Mix", sv.se$fam)]
-res.nest = res.nest[!(res.nest$V1 %in% sv.names.mix),]
-res.nest = res.nest[!(res.nest$V8 %in% sv.names.mix),]
+sv.graph$nodes.traits = sv.graph$nodes.traits[!grepl("^Mix", sv.graph$nodes.traits$type), ]
+sv.graph$nodes.traits = sv.graph$nodes.traits[sv.graph$nodes.traits$type != 'noTE',]
+nodes.remain = sv.graph$nodes.traits$node
+sv.graph$edges = sv.graph$edges[sv.graph$edges[,1] %in% nodes.remain, ]
+sv.graph$edges = sv.graph$edges[sv.graph$edges[,2] %in% nodes.remain, ]
 
 
-sv.names.mix = sv.se$name[sv.se$te == 'noTE']
-res.nest = res.nest[!(res.nest$V1 %in% sv.names.mix),]
-res.nest = res.nest[!(res.nest$V8 %in% sv.names.mix),]
-
-singleton.mode = F
-if(singleton.mode){
-  sv.names.freq = sv.se$name[sv.se$freq.max <= 3]
-  # sv.names.freq = sv.se$name[sv.se$freq.max >= 25]
-  res.nest = res.nest[res.nest$V1 %in% sv.names.freq,]
-  res.nest = res.nest[res.nest$V8 %in% sv.names.freq,]
-}
-
-prefix.mode = c('', '_single')
+# 
+# res.nest = res.nest0
+# 
+# sv.names.mix = sv.se$name[grep("^Mix", sv.se$fam)]
+# res.nest = res.nest[!(res.nest$V1 %in% sv.names.mix),]
+# res.nest = res.nest[!(res.nest$V8 %in% sv.names.mix),]
+# 
+# 
+# sv.names.mix = sv.se$name[sv.se$te == 'noTE']
+# res.nest = res.nest[!(res.nest$V1 %in% sv.names.mix),]
+# res.nest = res.nest[!(res.nest$V8 %in% sv.names.mix),]
+# 
+# singleton.mode = F
+# if(singleton.mode){
+#   sv.names.freq = sv.se$name[sv.se$freq.max <= 3]
+#   # sv.names.freq = sv.se$name[sv.se$freq.max >= 25]
+#   res.nest = res.nest[res.nest$V1 %in% sv.names.freq,]
+#   res.nest = res.nest[res.nest$V8 %in% sv.names.freq,]
+# }
+# 
+# prefix.mode = c('', '_single')
 
 
 ```
 
 
-### Construct
+
+### Plot te-type
 ```{r}
-# all edges
-idx = res.nest$p1 >= sim.cutoff
-edges = cbind(res.nest$V1[idx], res.nest$V8[idx])
-idx = res.nest$p8 >= sim.cutoff
-edges = rbind(edges, cbind(res.nest$V8[idx], res.nest$V1[idx]))
-te.enges.names = unique(c(edges[,1], edges[,2]))
-
-tmp = sv.se$te
-names(tmp) = sv.se$name
-te.enges.type = as.character(tmp[te.enges.names])
-names(te.enges.type) <- names(tmp[te.enges.names])
-
-
-tmp = sv.se$fam
-names(tmp) = sv.se$name
-te.enges.fam = tmp[te.enges.names]
-
-# nodes
-idx = (res.nest$p1 >= sim.cutoff) & (res.nest$p8 >= sim.cutoff)
-te.nodes = cbind(res.nest$V1[idx], res.nest$V8[idx])
-te.rest = setdiff(te.enges.names, c(te.nodes[,1], te.nodes[,2]))
-
-
-te.nodes.graph <- igraph::make_graph(t(te.nodes), directed = T)
-te.nodes.graph <- igraph::simplify(te.nodes.graph)
-te.nodes.comp <- igraph::components(te.nodes.graph)
-
-nodes = data.frame(node = paste('N', te.nodes.comp$membership, sep = ''), te = names(te.nodes.comp$membership))
-
-nodes.rest = data.frame(node = paste('R', (1:length(te.rest)), sep = ''), te = te.rest)
-nodes = rbind(nodes, nodes.rest)
-
-rownames(nodes) = nodes$te
-
-# Define TE type
-nodes.cnt = data.frame(cnt = c(table(nodes$node)))
-nodes.cnt$node = rownames(nodes.cnt)
-nodes.cnt$type = sapply(nodes.cnt$node, function(s){
-  s.te = nodes$te[nodes$node == s]
-  type.te = unique(te.enges.type[s.te])
-  if(length(type.te) == 1){
-    return(type.te)
-  } else {
-    type.te = table(type.te)
-    type.te = names(type.te)[type.te == max(type.te)]
-    return(type.te[1])
-  }
-})
-table(nodes.cnt$type)
-
-# Define TE family
-nodes.cnt$fam = sapply(nodes.cnt$node, function(s){
-  s.te = nodes$te[nodes$node == s]
-  type.te = unique(te.enges.fam[s.te])
-  if(length(type.te) == 1){
-    return(type.te)
-  } else {
-    type.te = table(type.te)
-    type.te = names(type.te)[type.te == max(type.te)]
-    return(type.te[1])
-  }
-})
-table(nodes.cnt$fam)
-
-
-# Redefine edges but with node names
-idx.endes = (edges[,1] %in% nodes$te) & (edges[,2] %in% nodes$te)
-b.graph = cbind(nodes[edges[idx.endes,1], 'node'],nodes[edges[idx.endes,2], 'node'])
-b.graph = unique(b.graph)
-# b.graph = b.graph[b.graph[,1] != b.graph[,2],]
-b.graph.uni = b.graph[b.graph[,1] == b.graph[,2],]
-b.graph = b.graph[b.graph[,1] != b.graph[,2],]
-
-length(unique(c(b.graph[,1], b.graph[,2])))
-
-# reduce indirect arrows
-idx.remove = c()
-for(i.edge in 1:nrow(b.graph)){
-  if(i.edge %% 1000 == 0) print(i.edge)
-  tmp.to = b.graph[b.graph[,1] == b.graph[i.edge,1],2]
-  tmp.from = b.graph[b.graph[,2] == b.graph[i.edge,2],1]
-  if(length(intersect(tmp.to, tmp.from)) > 0) idx.remove = c(idx.remove, i.edge)
-}
-idx.remove = unique(idx.remove)
-b.graph = b.graph[-idx.remove,]
-# b.graph = rbind(b.graph, b.graph.uni)
-
-# Print graph
-
-g.nodes.type = nodes.cnt$type
-names(g.nodes.type) = nodes.cnt$node
-g.nodes.cnt = nodes.cnt$cnt
-names(g.nodes.cnt) = nodes.cnt$node
-g.nodes.fam = nodes.cnt$fam
-names(g.nodes.fam) = nodes.cnt$node
-
-
-# g.cols.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
-# g.cols = c('#FFD966', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
-# names(g.cols) = g.cols.names
-
-
-g.part <- network(b.graph, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
-b.graph.names = network.vertex.names(g.part)
-
+g.part <- network(sv.graph$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.names = network.vertex.names(g.part)
 set.seed(20)
-p <- ggnet2(g.part, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names], 
-            color = g.nodes.type[b.graph.names],
-            # mode = 'kamadakawai',
-            # arrow.gap = 0, 
-            # arrow.size = 3,
-            palette = te.cols) + guides(size = F)
+p <- ggnet2(g.part, label = F, edge.color = "black",
+            node.size =  sv.graph$nodes.traits[g.part.names,]$cnt,
+            # node.size = 1,
+            # color = '#468B97',
+            # arrow.gap = 0.01, arrow.size = 2,
+            color = sv.graph$nodes.traits[g.part.names,]$type,
+            palette = te.cols
+            # mode = "kamadakawai"
+            ) + guides(size=F)
+
 p
 
-# path.figures  = '/Volumes/Samsung_T5/vienn/work_te/'
 pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_type.pdf', sep = ''), 
     width = 4.6, height = 4.6)
 print(p+ theme(legend.position = "none"))     # Plot 1 --> in the first page of PDF
 dev.off()
-
-
-# set.seed(20)
-# p <- ggnet2(g.part, label = F, edge.color = "grey30", 
-#             node.size = g.nodes.cnt[b.graph.names], 
-#             color = c('TE', 'noTE')[(g.nodes.type[b.graph.names] == 'noTE')*1+1],
-#             # mode = 'kamadakawai',
-#             # arrow.gap = 0, 
-#             # arrow.size = 3,
-#             palette = c('noTE' = 'black', 'TE' = '#AEC3AE')) + guides(size = F)
-# p
-# 
-# # path.figures  = '/Volumes/Samsung_T5/vienn/work_te/'
-# pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_type.pdf', sep = ''), 
-#     width = 5, height = 5)
-# print(p+ theme(legend.position = "none"))     # Plot 1 --> in the first page of PDF
-# dev.off()
-
 ```
 
 
 ### Colored by TE family
 ```{r}
-
-if(length(setdiff(g.nodes.fam, names(fam.palette)))!=0) stop('not all families are defined')
-
+g.part <- network(sv.graph$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.names = network.vertex.names(g.part)
 set.seed(20)
-p <- ggnet2(g.part, label = F, edge.color = "grey20", 
-            node.size = g.nodes.cnt[b.graph.names], 
-            color = g.nodes.fam[b.graph.names],
-            # mode = 'kamadakawai',
-            # arrow.gap = 0, 
-            # arrow.size = 3,
-            palette = fam.palette) + guides(size = F)
-p = p + theme(legend.text = element_text(size = 8), 
-          legend.title = element_blank(),
-          legend.key.size = unit(0.5, "cm")) + guides(color = guide_legend(ncol = 2))
+p <- ggnet2(g.part, label = F, edge.color = "black",
+            node.size =  sv.graph$nodes.traits[g.part.names,]$cnt,
+            # node.size = 1,
+            # color = '#468B97',
+            # arrow.gap = 0.01, arrow.size = 2,
+            color = sv.graph$nodes.traits[g.part.names,]$fam,
+            palette = fam.palette
+            # mode = "kamadakawai"
+            ) + guides(size=F)
+
 p
-
-
 pdf(paste(path.figures, 'graph_mob_all_cluster', prefix.mode[singleton.mode+1] ,'_family.pdf', sep = ''), 
     width = 4.6, height = 4.6)
 print(p+ theme(legend.position = "none"))     # Plot 1 --> in the first page of PDF
@@ -1358,16 +1310,13 @@ dev.off()
 ```
 
 
+
+
 ### Node size distribution
 ```{r}
-df = data.frame(node = unique(nodes$node))
-df$size = g.nodes.cnt[df$node]
-df$fam = g.nodes.fam[df$node]
-df$type = g.nodes.type[df$node]
 
-fam.palette
 
-p = ggplot(df, aes(x = type, y = size, color=fam)) +
+p = ggplot(sv.graph$nodes.traits, aes(x = type, y = cnt, color=fam)) +
   geom_jitter(width = 0.2) +
   labs(x = "Type", y = "Size") + 
   scale_y_continuous(trans = "log2") +
@@ -1388,62 +1337,72 @@ dev.off()
 
 ### Separately visualise connected components
 ```{r}
-tmp.graph <- igraph::make_graph(t(b.graph), directed = T)
-tmp.graph <- igraph::simplify(tmp.graph)
-tmp.comp <- igraph::components(tmp.graph)
 
-tmp.cnt = table(tmp.comp$membership)
-tmp.cnt = -sort(-tmp.cnt)
-head(tmp.cnt)
+# Get components
+g.comp <- getGraphComponents(sv.graph$edges)
 
+g.comp.cnt = table(g.comp$membership)
+g.comp.cnt = -sort(-g.comp.cnt)
+head(g.comp.cnt)
+
+# ------------------------------------
+# The biggest component
+# ------------------------------------
 k = 1
-tmp.k = as.numeric(names(tmp.cnt)[k])
-tmp.names = names(tmp.comp$membership)[tmp.comp$membership == tmp.k]
-b.graph.sub = b.graph[(b.graph[,1] %in% tmp.names) & 
-                        (b.graph[,2] %in% tmp.names),]
-
-g.part.sub.big <- network(b.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
-b.graph.names.sub.big = network.vertex.names(g.part.sub.big)
+comp.id = as.numeric(names(g.comp.cnt)[k])
 
 
+comp.names = names(g.comp$membership)[g.comp$membership == comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
+
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
+
+# Visualise
 set.seed(20)
 p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names.sub.big], 
-            color = g.nodes.type[b.graph.names.sub.big],
+            node.size = sv.graph$nodes.traits[g.part.sub.big.names,]$cnt, 
+            color = sv.graph$nodes.traits[g.part.sub.big.names,]$type,
             mode = 'kamadakawai',
             palette = te.cols) + guides(size = F)
 p.big.type = p + theme(legend.position = "none")
 
 set.seed(20)
 p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names.sub.big], 
-            color = g.nodes.fam[b.graph.names.sub.big],
+            node.size = sv.graph$nodes.traits[g.part.sub.big.names,]$cnt, 
+            color = sv.graph$nodes.traits[g.part.sub.big.names,]$fam,
             mode = 'kamadakawai',
             palette = fam.palette) + guides(size = F)
 p.big.color = p + theme(legend.position = "none")
 
+# ------------------------------------
+# Small components
+# ------------------------------------
 
-tmp.k = as.numeric(names(tmp.cnt)[k])
-tmp.names = names(tmp.comp$membership)[tmp.comp$membership != tmp.k]
-b.graph.sub = b.graph[(b.graph[,1] %in% tmp.names) & 
-                        (b.graph[,2] %in% tmp.names),]
+# Construct the graph object
+comp.names = names(g.comp$membership)[g.comp$membership != comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
 
-g.part.sub.small <- network(b.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
-b.graph.names.sub.small = network.vertex.names(g.part.sub.small)
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
 
-
+# Visualise
 set.seed(20)
-p <- ggnet2(g.part.sub.small, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names.sub.small], 
-            color = g.nodes.type[b.graph.names.sub.small],
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            node.size = sv.graph$nodes.traits[g.part.sub.big.names,]$cnt, 
+            color = sv.graph$nodes.traits[g.part.sub.big.names,]$type,
             # mode = 'kamadakawai',
             palette = te.cols) + guides(size = F)
-p.small.type =p + theme(legend.position = "none")
+p.small.type = p + theme(legend.position = "none")
 
 set.seed(20)
-p <- ggnet2(g.part.sub.small, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names.sub.small], 
-            color = g.nodes.fam[b.graph.names.sub.small],
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            node.size = sv.graph$nodes.traits[g.part.sub.big.names,]$cnt, 
+            color = sv.graph$nodes.traits[g.part.sub.big.names,]$fam,
             # mode = 'kamadakawai',
             palette = fam.palette) + guides(size = F)
 p.small.color = p + theme(legend.position = "none")
@@ -1486,7 +1445,7 @@ dev.off()
 ```
 
 
-## Examples with big "has TE"
+## Example components with big nodes
 ```{r}
 
 path.components = paste(path.figures, 'components/', sep = '')
@@ -1494,50 +1453,82 @@ if (!dir.exists(path.components)) {
   dir.create(path.components)
 }
 
-# Find a big node, whish is "Have te", which which is not in the biggest connected component
-
-nodes.havete.big = nodes.cnt$node[(nodes.cnt$cnt >= 7) & ((nodes.cnt$type == 'hasTE') | (nodes.cnt$type == 'hasTEpart'))]
-nodes.havete.big = nodes.havete.big[nodes.havete.big %in% names(tmp.comp$membership)]
+nodes.big = sv.graph$nodes.traits$node[(sv.graph$nodes.traits$cnt >= 5) ]
+nodes.big = nodes.big[nodes.big %in% names(g.comp$membership)]  # I don't know why
 
 
-nodes.target = unique(nodes.havete.big[tmp.comp$membership[nodes.havete.big] != as.numeric(names(tmp.cnt)[1])])
+comp.target = sort(setdiff(unique(g.comp$membership[nodes.big]), comp.id))
 
-# for(i.target in 1:min(80, length(nodes.target))){
-for(i.target in c(1)){
-  message(i.target)
-  
-  comp.target = as.numeric(tmp.comp$membership[nodes.target[i.target]])
+
+for(i.target in comp.target){
+# for(i.target in comp.target[1]){
+
   
   # Visualise one component
   
-  tmp.k = comp.target
-  tmp.names = names(tmp.comp$membership)[tmp.comp$membership == tmp.k]
-  b.graph.sub = b.graph[(b.graph[,1] %in% tmp.names) | 
-                          (b.graph[,2] %in% tmp.names),,drop=F]
+  sub.names = names(g.comp$membership)[g.comp$membership == i.target]
+  b.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% sub.names) | 
+                                 (sv.graph$edges[,2] %in% sub.names),,drop=F]
   
-  g.part.sub.big <- network(b.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
-  b.graph.names.sub.big = network.vertex.names(g.part.sub.big)
-  
-  
-  set.seed(20)
-  p.te <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
-              node.size = g.nodes.cnt[b.graph.names.sub.big], 
-              color = g.nodes.type[b.graph.names.sub.big],
-              mode = 'kamadakawai',
-              arrow.gap = 0.04, arrow.size = 5,
-              palette = te.cols) + guides(size = F)+ theme(legend.position = "none")
+  g.sub <- network(b.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+  g.sub.names = network.vertex.names(g.sub)
   
   
   set.seed(20)
-  p.fam <- ggnet2(g.part.sub.big, label = g.nodes.cnt[b.graph.names.sub.big], edge.color = "black", 
-              node.size = g.nodes.cnt[b.graph.names.sub.big],
-              # node.size = 10, 
-              color = g.nodes.fam[b.graph.names.sub.big],
+  p.te <- ggnet2(g.sub, 
+                 label = F, 
+                 edge.color = "black", 
+              node.size = sv.graph$nodes.traits[g.sub.names,]$cnt,
+              # node.size = 7,
+              color =  sv.graph$nodes.traits[g.sub.names,]$type,
               mode = 'kamadakawai',
-              arrow.gap = 0.04, arrow.size = 5,
-              palette = fam.palette) + guides(size = F)+ theme(legend.position = "none")
+              arrow.gap = 0.06, arrow.size = 5,
+              palette = te.cols) +
+    guides(size = F) +
+    # theme_minimal() + ylab(NULL) + xlab('Number: freq of presence') +
+      theme(legend.key.size = unit(0.5, "cm"))  +
+      guides(color = guide_legend(ncol = 2 )) + 
+                   theme(legend.position = "bottom")
+      
+  set.seed(20)
+  p.fam <- ggnet2(g.sub, label = sv.graph$nodes.traits[g.sub.names,]$cnt, edge.color = "black", 
+              node.size = sv.graph$nodes.traits[g.sub.names,]$cnt, 
+              color =  sv.graph$nodes.traits[g.sub.names,]$fam,
+              mode = 'kamadakawai',
+              arrow.gap = 0.06, arrow.size = 5,
+              palette = fam.palette) +
+    guides(size = F) +
+    # theme_minimal() + ylab(NULL) + xlab('Number: node size') +
+      theme(legend.key.size = unit(0.5, "cm"))  +
+      guides(color = guide_legend(ncol = 2 )) + 
+                   theme(legend.position = "bottom")
+  # p.fam
   
-  pp = ggarrange(p.te, p.fam, nrow=1)
+  
+  
+    set.seed(20)
+  p.freq <- ggnet2(g.sub, 
+                 label = sv.graph$nodes.traits[g.sub.names,]$freq, 
+                 label.color = 'white',
+                 label.size = 3,
+                 edge.color = "black", 
+              # node.size = sv.graph$nodes.traits[g.sub.names,]$cnt, 
+              node.size = 7,
+              color =  sv.graph$nodes.traits[g.sub.names,]$indel,
+              mode = 'kamadakawai',
+              arrow.gap = 0.06, arrow.size = 5,
+              palette = indel.pallete
+              ) +
+    guides(size = F) +
+    # theme_minimal() + ylab(NULL) + xlab('Number: freq of presence') +
+      theme(legend.key.size = unit(0.5, "cm"))  +
+      guides(color = guide_legend(ncol = 2 )) + 
+                   theme(legend.position = "bottom")
+  
+  pp = invisible(ggarrange(p.te,
+                 p.fam ,
+                 p.freq,
+                 nrow=1))
   
   # pp
   
@@ -1546,6 +1537,7 @@ for(i.target in c(1)){
   pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.target),'.pdf', sep = ''), 
       width = 6, height = 3)
   print(pp)     # Plot 1 --> in the first page of PDF
+
   dev.off()
 
 }
@@ -1553,14 +1545,24 @@ for(i.target in c(1)){
 
 
 ```
+
+
+
+
 ### Get sequences and align
 ```{r}
+
 
 path.mafft = paste(path.work, 'mafft/', sep = '')
 if (!dir.exists(path.mafft)) {
   dir.create(path.mafft)
 }
-  
+
+i.target = 66
+comp.target = as.numeric(tmp.comp$membership[nodes.target[i.target]])
+tmp.k = comp.target
+tmp.names = names(tmp.comp$membership)[tmp.comp$membership == tmp.k]
+
 sv.name.target = nodes$te[nodes$node %in% tmp.names]
 
 seqs.target = sv.seqs[sv.name.target]
@@ -1569,7 +1571,6 @@ seqs.target = seqs.target[order(-seqs.target.len)]
 sv.name.target = names(seqs.target)
 
 # Find orientations of sequences
-
 
 bl.target = bl.res[(bl.res$V1 %in% sv.name.target) & (bl.res$V8 %in% sv.name.target),]
 orientation.target = rep('.', length(seqs.target))
@@ -1608,8 +1609,6 @@ seqs.target.msa <- DNAStringSet(seqs.target.msa)
 
 # alignment <- msa(seqs.target.msa)
 
-
-
 # Run the alignment
 tmp.fasta = paste(path.mafft, 'tmp.fasta', sep = '')
 aln.fasta = paste(path.mafft, 'aln.fasta', sep = '')
@@ -1620,7 +1619,18 @@ system(paste('mafft --op 5 --quiet --maxiterate 100 ', tmp.fasta, '>', aln.fasta
 alignment = readDNAStringSet(aln.fasta)
 
 seqs.mx = as.matrix(alignment)
-msaplot(seqs.mx)
+p.msa = msaplot(seqs.mx)
+
+p.msa
+
+rownames(sv.se) = sv.se$gr
+f.sv = sv.se[sub("\\|.*$", "", names(alignment)),]$freq.max
+
+
+pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.target),'_msa.pdf', sep = ''), 
+    width = 6, height = 4)
+print(p.msa)     # Plot 1 --> in the first page of PDF
+dev.off()
 
 ```
 

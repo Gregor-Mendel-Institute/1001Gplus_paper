@@ -44,21 +44,60 @@ ggedges <- function(edges.linear, label = F, size = 5){
 #' @param seqs.trait A vector containing the traits for sequences. 
 #' Names of sequences sould be correct!
 #' @param explain.mix An indicator to extend "Mix" annotation
+#' @param mode A character string specifying the mode of operation. Options include:
+#' \itemize{
+#'   \item \strong{"unique"}: Returns unique trait values. If there are multiple unique values, it will either label as "Mix" or provide detailed mixed traits based on \code{explain.mix}.
+#'   \item \strong{"mean"}: Returns the mean of trait sequences.
+#'   \item \strong{"max"}: Returns the maximum value from trait sequences.
+#'   \item \strong{"min"}: Returns the minimum value from trait sequences.
+#' }
+#' Other modes can be added as needed.
 #' 
 #' @return A vector containing the trait for each node.
 #' 
-traitsSeqToNode <- function(nodes, seqs.trait, explain.mix = F){
-  nodes.trait = sapply(nodes$node, function(s){
-    s.seq = nodes$name[nodes$node == s]
-    traits.tmp = unique(seqs.trait[s.seq])
-    if(length(traits.tmp) == 1){
-      return(traits.tmp)
-    } else if (explain.mix){
-      return(paste('Mix:', paste(sort(traits.tmp), sep = ','), sep = ''))
+#' 
+traitsSeqToNode <- function(nodes, seqs.trait, explain.mix = F, 
+                            mode = 'maxunique',
+                            mix.word = 'Mix',
+                            mix.word.explain = 'Mix:'){
+  if (mode == "unique") {
+    nodes.trait <- tapply(seqs.trait, nodes$node, function(x) {
+      return(paste(unique(x), collapse = ','))
+    })
+    if(explain.mix){
+      nodes.trait[grepl(",", nodes.trait)] <- paste(mix.word.explain, sort(nodes.trait[grepl(",", nodes.trait)]), sep = '')
     } else {
-      return('Mix')
+      nodes.trait[grepl(",", nodes.trait)] <- mix.word
     }
-  })
+  } else if (mode == "maxunique") {
+    nodes.trait <- tapply(as.character(seqs.trait), nodes$node, function(x) {
+      x = unique(x)
+      if(length(x) == 1){
+        return(x)
+      } else {
+        x = table(x)
+        x = names(x)[x == max(x)]
+        return(x[1])
+      }
+    })
+    
+  } else if (mode == "mean") {
+    nodes.trait <- tapply(seqs.trait, nodes$node, function(x) {
+      return(mean(x))
+    })
+  } else if (mode == "max") {
+    nodes.trait <- tapply(seqs.trait, nodes$node, function(x) {
+      return(max(x))
+    })
+  } else if (mode == "min") {
+    nodes.trait <- tapply(seqs.trait, nodes$node, function(x) {
+      return(min(x))
+    })
+  } 
+  else {
+    stop(paste("Invalid mode selected:", mode))
+  }
+  
   return(nodes.trait)
 }
 
@@ -88,6 +127,14 @@ getGraphComponents <- function(edges){
 #' V6 - similarity from 0 to 100
 #' V7 - length
 #' 
+#' @param res.nest A dataframe resulting from the nestedness detection procedure.
+#' This dataframe must contain specific columns, either \code{c("V1", "V8", "p1", 'p8')} 
+#' or \code{c("C1", "C8", "V1", "V8", "len1", "len8")}. In case it contains the latter set 
+#' of columns and not the former, two new columns \code{p1} and \code{p8} will be computed.
+#' 
+#' If both \code{bl.res} and 
+#' \code{res.nest} are either NULL or not NULL, an error will be thrown.
+#' 
 #' @param sim.cutoff similarity to establish an edge between sequences
 #' this is for both: (1) sequence blast similarity, (2) length similarity.
 #' 
@@ -113,47 +160,71 @@ getGraphComponents <- function(edges){
 #'     \item{edges}{A matrix representing the edges of the graph}
 #'     \item{nodes}{A matrix reflecting the relationship between BLAST queries and collapsed nodes.}
 #'     \item{node.traits}{A data frame representing traits associated with nodes.}
+#'     \term{nestedness}{A dataframe resulting from the nestedness detection procedure.}
 #'   }
 #' 
-getGraphFromBlast <- function(bl.res, sim.cutoff = 0.85, i.len.field = 5, 
-                              collapse = T, refine = T,
+getGraphFromBlast <- function(bl.res = NULL, 
+                              res.nest = NULL,
+                              sim.cutoff = 0.85, 
+                              i.len.field = 5, 
+                              collapse = T, 
+                              refine = T,
                               min.length = 0,
                               max.length = Inf,
                               return.nest = F,
                               echo = T){
   
-  # nestedness
-  bl.res = bl.res[bl.res$V1 != bl.res$V8,]
-  bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
-  
-  # Length of sequences (optimised approach)
-  res.nest.len = sapply(unique(c(bl.res$V1, bl.res$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
-  if(sum(is.na(res.nest.len)) != 0){
-    stop(paste('Be careful with extracting sequence lengths.\n',
-               'It a positionsl information in their names.\n',
-               'Current length slot is ', i.len.field, sep = ''))
-  }
-  # lengths are different from the default
-  arg.defaults <- formals(sys.function(sys.nframe()))
-  if((min.length != arg.defaults$min.length) | (max.length != arg.defaults$max.length)){
-    message(paste('New lengths', min.length, max.length))
-    res.nest.len = res.nest.len[res.nest.len >= min.length]
-    res.nest.len = res.nest.len[res.nest.len <= max.length]
-    bl.res = bl.res[bl.res$V1 %in% names(res.nest.len),]
-    bl.res = bl.res[bl.res$V8 %in% names(res.nest.len),]
+  if (is.null(bl.res) == is.null(res.nest)) {
+    stop("Both parameters cannot be NULL or both not NULL.")
   }
   
-  # Find nestedness
-  cat('Find Nestedness...')
-  res.nest = findNestedness(bl.res, use.strand = F)
-  cat(' done!\n')
+  if(is.null(res.nest)){
+    
+    # nestedness
+    bl.res = bl.res[bl.res$V1 != bl.res$V8,]
+    bl.res = bl.res[bl.res$V6 >= sim.cutoff * 100,]
+    
+    # Length of sequences (optimised approach)
+    res.nest.len = sapply(unique(c(bl.res$V1, bl.res$V8)), function(s) as.numeric(strsplit(s, '\\|')[[1]][i.len.field]))
+    if(sum(is.na(res.nest.len)) != 0){
+      stop(paste('Be careful with extracting sequence lengths.\n',
+                 'It a positionsl information in their names.\n',
+                 'Current length slot is ', i.len.field, sep = ''))
+    }
+    # lengths are different from the default
+    arg.defaults <- formals(sys.function(sys.nframe()))
+    if((min.length != arg.defaults$min.length) | (max.length != arg.defaults$max.length)){
+      message(paste('New lengths', min.length, max.length))
+      res.nest.len = res.nest.len[res.nest.len >= min.length]
+      res.nest.len = res.nest.len[res.nest.len <= max.length]
+      bl.res = bl.res[bl.res$V1 %in% names(res.nest.len),]
+      bl.res = bl.res[bl.res$V8 %in% names(res.nest.len),]
+    }
+    
+    # Find nestedness
+    cat('Find Nestedness...')
+    res.nest = findNestedness(bl.res, use.strand = F)
+    cat(' done!\n')
+    
   
-
-  # Gen lengths
-  res.nest$len1 = res.nest.len[res.nest$V1]
-  res.nest$len8 = res.nest.len[res.nest$V8]
-  res.nest$p1 = res.nest$C1 / res.nest$len1
-  res.nest$p8 = res.nest$C8 / res.nest$len8
+    # Gen lengths
+    res.nest$len1 = res.nest.len[res.nest$V1]
+    res.nest$len8 = res.nest.len[res.nest$V8]
+    res.nest$p1 = res.nest$C1 / res.nest$len1
+    res.nest$p8 = res.nest$C8 / res.nest$len8
+  
+  } else {
+    
+    required.cols <- c("V1", "V8", "p1", 'p8')
+    if (!all(required.cols %in% names(res.nest))) {
+      required.cols <- c("C1", "C8", "V1", "V8", "len1", "len8")
+      if (!all(required.cols %in% names(res.nest))) {
+        stop(paste0(c("res.nest must have the following columns:", required.cols), collapse = ', '))
+      }
+      res.nest$p1 = res.nest$C1 / res.nest$len1
+      res.nest$p8 = res.nest$C8 / res.nest$len8
+    }
+  }
   
   
   # Remain only those blast hits, which satisfy sim.cutoff

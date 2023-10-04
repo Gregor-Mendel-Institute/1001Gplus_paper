@@ -48,7 +48,8 @@ i.len.field = 5
 # Graph construction
 ## Whole graph
 ```{r}
-g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, i.len.field = i.len.field, collapse = T, refine = F)
+g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, 
+                                   i.len.field = i.len.field, collapse = T, refine = F)
 
 g.part <- network(g.content.comp$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
 b.graph.names = network.vertex.names(g.part)
