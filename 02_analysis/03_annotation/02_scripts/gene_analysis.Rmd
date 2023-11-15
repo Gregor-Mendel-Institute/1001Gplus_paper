@@ -21,6 +21,7 @@ path.svs = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', 
 file.pangen.genes = paste('genes_',s.version,'_pangen_all.gff', sep = '')
 
 path.figures  = paste(path.base, '02_analysis/03_annotation/03_figures/', sep = '')
+path.data  = paste(path.base, '02_analysis/03_annotation/01_data/', sep = '')
 # Previous figures:
 # path.figures  = '/Volumes/Samsung_T5/vienn/work_duplicated/figures/'
 
@@ -1109,6 +1110,46 @@ dev.off()
 ```
 
 
+## Along chromosomes
+```{r}
+
+gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te,
+                                           s.annot$te.like)),]
+
+
+# gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te)),]
+
+g <- ggplot(gff.new.part, 
+            aes(x=V4, fill = annot)) + 
+  geom_histogram(bins = 50, color='grey20') +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+    xlab('Pangenome coordinate') + 
+  ylab('Absolute amount') +
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  scale_fill_manual(values = colors_new_types) +
+  guides(fill=guide_legend(title="TE \ncoverage")) +
+  theme(
+    # legend.position = c(0.9, 0.45),
+    legend.position = "none",
+        legend.background = element_rect(fill = "white", color = "grey20")) +
+ theme(legend.key.size = unit(0.4,"cm"))
+
+g
+
+pdf(paste(path.figures, 'genes_new_go_along_chr.pdf', sep = ''), width = 6, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+# pdf(paste(path.figures, 'gene_chr_distr_new_genes_te.pdf', sep = ''), width = 5, height = 4)
+# print(g)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+```
+
 # Frequency of presence
 ## Prepare matrices
 ```{r}
@@ -1318,7 +1359,7 @@ g2 <- ggplot() +
 
 g2
 
-pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot_note_collapsed.pdf', sep = ''), width = 2.5, height = 3)
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot_note_collapsed.pdf', sep = ''), width = 3, height = 3)
 print(g2)     # Plot 1 --> in the first page of PDF
 dev.off()
 
@@ -1569,6 +1610,215 @@ g
 ```
 
 # Expression analysis
+
+## Alexandra
+```{r}
+gff.new.alex = read.table(paste(path.data, 'gff_new.with_expression_stats.txt', sep = ''), 
+                          stringsAsFactors = F, header = 1, sep = '\t')
+rownames(gff.new.alex) = gff.new.alex$group
+gff.new.alex = gff.new.alex[gff.new$group,]
+
+s.expr = list(expr.6909 = 'expr.6909',
+              na.6909 = 'na.6909',
+              noexpr.6909 = 'noexpr.6909',
+              noexpr.all = 'noexpr.all')
+
+gff.new$expr.gr = s.expr$noexpr.6909
+gff.new$expr.gr[gff.new.alex$expressed_in_6909] = s.expr$expr.6909
+gff.new$expr.gr[gff.new.alex$expressed_nowhere] = s.expr$noexpr.all
+gff.new$expr.gr[gr.g.acc[gff.new$group, '6909'] == 0] = s.expr$na.6909
+
+table(gff.new$expr.gr)
+
+```
+
+### Bar-plot
+```{r}
+gff.new.part = gff.new
+gff.new.part$go[gff.new.part$go %in% names(haim.go.total)[haim.go.total < 50]] = 'Other'
+
+
+# Define two groups: TE and non-TE
+idx.te = gff.new.part$annot %in% c(s.annot$te, s.annot$te.like)
+
+# Find maximum of TEs
+cnt.expr = table(gff.new.part$expr.gr[idx.te])
+cnt.expr.names = names(cnt.expr)
+y.min = -max(cnt.expr)
+
+# Find maximum of non-TEs
+cnt.expr = table(gff.new.part$expr.gr[!idx.te])
+cnt.expr.names = names(cnt.expr)
+y.max = max(cnt.expr)
+
+labels.df <- data.frame(
+  x = factor(cnt.expr.names, levels = cnt.expr.names),
+  y = c(cnt.expr) + 50,
+  label = paste(cnt.expr, ' (', round(cnt.expr/sum(cnt.expr), 2) * 100, '%)', sep = '')
+)
+
+gff.new.part$expr.gr = factor(gff.new.part$expr.gr, levels = cnt.expr.names)
+
+
+
+g <- ggplot(gff.new.part, aes(x = expr.gr, fill = annot)) +
+  theme_minimal() +
+  geom_bar(data = subset(gff.new.part, idx.te),
+           aes(y = - ..count.. ), position = 'stack', color = '#121013', size = 0.2) + 
+  geom_bar(data = subset(gff.new.part, !idx.te),
+           aes(y = + ..count.. ), position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab(NULL) +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  # annotate("text", x = 1, y = y.max + 300, 
+  #          label = "Number of genes (%)", size = 4,
+  #          vjust = -0.5) + 
+  ylim(c(y.min, y.max + 400)) + 
+  geom_text(data = labels.df, aes(x = x, y = y, label = label), vjust = -0.5, inherit.aes = FALSE)
+
+g 
+
+
+pdf(paste(path.figures, 'genes_new_go_expr_',
+          c('all', 'no_te')[mode.no.te + 1],
+          '.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+```{r}
+g <- ggplot(gff.new.part, aes(y = expr.gr, fill = annot)) +
+  theme_minimal() +
+  geom_bar(data = subset(gff.new.part, idx.te),
+           aes(x = - ..count..), position = 'stack', color = '#121013', size = 0.2) + 
+  geom_bar(data = subset(gff.new.part, !idx.te),
+           aes(x = + ..count..), position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  ylab(NULL) +
+  labs(fill = NULL) + xlab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  xlim(c(y.min, y.max + 400)) + 
+  geom_text(data = labels.df, aes(y = x, x = y, label = label), hjust = -0.5, inherit.aes = FALSE)
+g 
+```
+
+
+### Split-plot
+```{r}
+library(dplyr)
+gff.new$annot = factor(gff.new$annot, levels = s.annot)
+# gff.new.part$annot = factor(gff.new.part$annot,levels = rev(unlist(s.annot)))
+# gff.new.part = gff.new
+gff.new.part$idx.te = gff.new.part$annot %in% c(s.annot$te, s.annot$te.like)
+
+# Рассчитаем количество для каждой группы и типа
+count_df <- gff.new.part %>%
+  group_by(expr.gr, annot) %>%
+  summarise(count = n()) %>%
+  arrange(expr.gr, annot)
+
+# Создаем координаты для geom_rect
+count_df <- count_df %>%
+  group_by(expr.gr) %>%
+  mutate(ymin = lag(cumsum(count), default = 0),
+         ymax = cumsum(count)) %>%
+  ungroup()
+
+count_df$te = count_df$annot %in% c(s.annot$te, s.annot$te.like)
+
+
+y.shift = tapply(count_df[count_df$te,]$ymax, count_df[count_df$te,]$expr.gr, max)
+n.gap = 100
+y.te = c(-n.gap, n.gap)
+
+count_df$ymin = count_df$ymin - y.shift[count_df$expr.gr] + y.te[1*(!count_df$te) + 1]
+count_df$ymax = count_df$ymax - y.shift[count_df$expr.gr] + y.te[1*(!count_df$te) + 1]
+
+count_df$x = -as.numeric(count_df$expr.gr)
+
+labels.df <- count_df %>%
+  group_by(expr.gr, te) %>%
+  summarise(count = sum(count), .groups = "drop") %>%
+  mutate(x = ifelse(te == TRUE, -1 * count - n.gap, count + n.gap))
+labels.df = labels.df %>%
+  group_by(te) %>%
+  mutate(p = count / sum(count)) %>%
+  ungroup()
+labels.df$y = -as.numeric(labels.df$expr.gr)
+labels.df$label = paste(labels.df$count, ' (', round(labels.df$p, 2) * 100, '%)', sep = '')
+labels.df$xjust = c(0, 1)[labels.df$te*1 + 1]
+
+# New position
+labels.df$x = c(n.gap+10, -n.gap-10)[labels.df$te*1 + 1]
+
+x.tick = c(rev(-seq(0,3000,1000)) - n.gap, seq(0,2000,1000) + n.gap)
+x.tick.lab = c(rev(seq(0,3000,1000)), seq(0,2000,1000))
+
+n.width = 0.3
+g <- ggplot(count_df, aes(xmin = ymin, xmax = ymax, ymin = x-n.width, ymax = x+n.width, fill = annot)) +
+  theme_minimal() +
+  geom_vline(aes(xintercept = n.gap), color = "grey30") +
+  geom_vline(aes(xintercept = -n.gap), color = "grey30") +
+  geom_rect(color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  ylab(NULL) + xlab(NULL) +
+  labs(fill = NULL) + 
+  theme(legend.position = 'none') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  # guides(fill = guide_legend(ncol = 3)) +
+  geom_text(data = labels.df, aes(x = x, y = y + n.width + 0.05, label = label , hjust = xjust), 
+            vjust = 0,
+            inherit.aes = FALSE) +
+  scale_x_continuous(breaks = x.tick, labels = x.tick.lab) +
+  scale_y_continuous(breaks = -4:-1, labels = rev(levels(labels.df$expr.gr))) +
+  theme(panel.grid.minor.x = element_blank(), 
+          panel.grid.minor.y = element_blank()) 
+g 
+
+pdf(paste(path.figures, 'genes_new_annot_expr_horizontal.pdf', sep = ''), width = 5, height = 3)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+```{r}
+g <- ggplot(gff.new.part, aes(x = expr.gr, fill = go)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  # scale_fill_manual(values = colors_new_types) +
+  # scale_fill_manual(values = colors_go) +
+  xlab(NULL) +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  # annotate("text", x = 1, y = y.max + 300, 
+  #          label = "Number of genes (%)", size = 4,
+  #          vjust = -0.5) + 
+  ylim(c(0, y.max + 400)) + 
+  geom_text(data = labels.df, aes(x = x, y = y, label = label), vjust = -0.5, inherit.aes = FALSE)
+
+g 
+
+
+pdf(paste(path.figures, 'genes_new_annot_expr_',
+          c('all', 'no_te')[mode.no.te + 1],
+          '.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
 
 ## DeSeq2
 ```{r}

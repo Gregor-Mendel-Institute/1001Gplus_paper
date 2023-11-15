@@ -1,0 +1,451 @@
+---
+title: "Saturation Curves"
+output: null_document
+---
+
+# Setup
+```{r}
+library(ggplot2)
+path.work = '/Volumes/Samsung_T5/vienn/work_sv/'
+
+
+path.figures = paste(path.work, 'figures/', sep = '')
+
+path.genes = '/Volumes/Samsung_T5/vienn/work_genomes/'
+
+file.sv = 'sv_se.rds'
+
+```
+
+
+# SV
+## Reading
+```{r}
+sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+
+
+accessions = c('0','10002', '10015', '10024', '1741', '220011', '22002', '22003', '22004', 
+               '22005', '22006', '22007', '6024', '6069', '6124', '6244', '6909', '6966', 
+               '8236', '9075', '9537', '9543', '9638', '9728', '9764', '9888', '9905', '9981')
+v <- sv.se$len / 2
+N <- length(accessions)
+v.rep <- rep(v, N)
+sv.len.mx <- t(matrix(v.rep, ncol = length(v), byrow = TRUE))
+sv.se.bin = (sv.se[,accessions] > sv.len.mx) * 1
+rownames(sv.se.bin) = sv.se$gr
+
+```
+
+## Saturation
+
+```{r}
+
+
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+df.sat = c()
+
+sv.sat = sv.se.bin
+sv.sat.len = sv.se$len
+
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, i.rep))
+  }
+  # stop()
+}
+
+
+df.sat = data.frame(df.sat)
+colnames(df.sat) = c('n.gen', 'n.sv', 'i.rep')
+
+
+g <- ggplot(df.sat, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+
+```
+
+## Saturation by length
+```{r}
+
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+df.sat = c()
+
+
+for(i.len.gr in 2:length(len.gr)){
+  message(paste('Length', len.gr[i.len.gr]))
+  sv.sat = sv.se.bin[sv.se$len.gr == len.gr[i.len.gr],]
+  sv.sat.len = sv.se$len[sv.se$len.gr == len.gr[i.len.gr]]
+  
+  for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+    for(i.rep in 1:n.rep){
+      i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+      sv.sat.rep = sv.sat[,i.accs]
+      x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+      if(x == 0) stop()
+      # print(c(i.accs, x))
+      df.sat = rbind(df.sat, c(n.gen, x, i.rep, i.len.gr))
+    }
+    # stop()
+  }
+
+}
+
+df.sat = data.frame(df.sat)
+colnames(df.sat) = c('n.gen', 'n.sv', 'i.rep', 'length')
+
+
+g <- ggplot(df.sat, aes(x=n.gen, y=n.sv, color = as.factor(length))) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+
+
+
+```
+
+
+
+# Genes
+```{r}
+
+i.chr = 3
+file.genes = paste(path.genes, 'chr_',i.chr,'_own_genomes_v04.gff', sep = '')
+gff = read.table(file.genes, stringsAsFactors = F)
+head(gff)
+
+gff.gene = gff[gff$V3 == 'gene',]
+gff.mrna = gff[gff$V3 == 'mRNA',]
+
+
+head(gff.gene)
+
+gff.gene$gr = sapply(gff.gene$V9, function(s){
+  s = strsplit(s, ';')[[1]][1]
+  s = strsplit(s, '\\.')[[1]][1]
+  return(s)
+})
+gff.gene$acc = sapply(gff.gene$V1, function(s) strsplit(s, '_')[[1]][1])
+
+cnt.gene = table(gff.gene$gr, gff.gene$acc)
+
+
+x = table(rowSums(cnt.gene))
+sum(x[-27])
+
+```
+
+```{r}
+
+sv.sat = cnt.gene
+
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, i.rep, i.len.gr))
+  }
+  # stop()
+}
+
+
+df.sat1 = data.frame(df.sat)
+colnames(df.sat) = c('n.gen', 'n.sv', 'i.rep', 'length')
+df.sat1$type = 'gene'
+
+g <- ggplot(df.sat, aes(x=n.gen, y=n.sv, color = as.factor(length))) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of variable genes')  
+  
+g
+
+
+```
+
+
+
+
+
+```{r}
+
+gff.mrna = gff[gff$V3 == 'mRNA',]
+
+head(gff.gene)
+
+gff.mrna$gr = sapply(gff.mrna$V9, function(s){
+  s = strsplit(s, ';')[[1]][1]
+  s = strsplit(s, '\\.')[[1]][1]
+  return(s)
+})
+gff.mrna$acc = sapply(gff.mrna$V1, function(s) strsplit(s, '_')[[1]][1])
+
+cnt.mrna = table(gff.mrna$gr, gff.mrna$acc)
+
+
+x = table(rowSums(cnt.mrna))
+sum(x[-27])
+
+sv.sat = cnt.mrna
+
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, i.rep, i.len.gr))
+  }
+  # stop()
+}
+
+
+df.sat2 = data.frame(df.sat)
+colnames(df.sat) = c('n.gen', 'n.sv', 'i.rep', 'length')
+df.sat2$type = 'mnra'
+
+df.sat = rbind(df.sat1, df.sat2)
+
+colnames(df.sat) =  c('n.gen', 'n.sv', 'i.rep', 'length', 'type')
+
+
+g <- ggplot(df.sat, aes(x=n.gen, y=n.sv, color = as.factor(type))) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of variable genes')  
+  
+g
+```
+
+
+
+# SVs between two accessions
+## ON THE SERVER
+```{r}
+path.work = '../cmp_all/'
+path.out = paste(path.work, 'sv_pw_stat/', sep = '')
+if (!file.exists(path.out)) {
+  dir.create(path.out)
+}
+
+for(i.chr in 1:5){
+  v = readRDS(paste(path.work, 'val_common_chr_', i.chr, '_ref_add.rds',sep = ''))
+  n.acc = 28
+  accessions = colnames(v)[1:n.acc]
+  v = v[,accessions]
+  v = (v != 0) * 1
+  
+  counts.all = c()
+  len.mean.all = c()
+  len.median.all = c()
+  for(i.acc in 1:n.acc){
+    for(j.acc in 1:n.acc){
+      if(j.acc <= i.acc) next
+      message(paste(i.acc, j.acc))
+      sv.tmp = v[,i.acc] + v[, j.acc]
+      sv.tmp = sv.tmp[sv.tmp != 0]
+      
+      n.tmp = length(sv.tmp)
+      pos.after.2 <- which(sv.tmp[-1] == 1 & sv.tmp[-n.tmp] == 2) + 1
+      pos.before.2 <- which(sv.tmp[-n.tmp] == 1 & sv.tmp[-1] == 2)
+      
+      if(sv.tmp[1] == 1) pos.after.2 = c(1, pos.after.2)
+      if(sv.tmp[n.tmp] == 1) pos.before.2 = c(pos.before.2, n.tmp)
+      
+      
+      sv.len = pos.before.2 - pos.after.2 + 1
+      message(paste('Min length', min(sv.len)))
+      
+      thresholds <- c(0, 15, 50, 100, 200, 500, 1000, 2000, 5000, 10000, Inf)
+      sv.thresholds = cut(sv.len, breaks = thresholds)
+      
+      counts <- c(table(sv.thresholds))
+      counts.all = rbind(counts.all, c(i.acc, j.acc, counts))
+      
+      len.mean.all = rbind(len.mean.all, tapply(sv.len, sv.thresholds, mean))
+      len.median.all = rbind(len.median.all, tapply(sv.len, sv.thresholds, median))
+      
+    }
+  }
+  
+  counts.all = as.data.frame(counts.all)
+  counts.all[,1] = accessions[counts.all[,1]]
+  counts.all[,2] = accessions[counts.all[,2]]
+  write.table(counts.all, file = paste(path.out, 'sv_pw_counts_',i.chr,'.txt', sep = ''), 
+              quote = F, col.names = T, row.names = F, sep = '\t')
+  
+  write.table(len.mean.all, file = paste(path.out, 'sv_pw_len_mean_',i.chr,'.txt', sep = ''), 
+              quote = F, col.names = T, row.names = F, sep = '\t')
+  
+  write.table(len.median.all, file = paste(path.out, 'sv_pw_len_median_',i.chr,'.txt', sep = ''), 
+              quote = F, col.names = T, row.names = F, sep = '\t')
+  
+  
+  rm(v)
+  gc()
+}
+
+
+```
+
+
+## ON LAPTOP
+## Plot
+```{r}
+library(ggplot2)
+path.work = '../01_data/'
+path.figures = '../03_figures/'
+```
+
+
+```{r}
+df.cnt = 0
+df.mean = 0
+df.median = 0
+for(i.chr in 1:5){
+  
+  f.cnt = paste(path.work, 'sv_pw_counts_',i.chr,'.txt', sep = '')
+  f.mean = paste(path.work, 'sv_pw_len_mean_',i.chr,'.txt', sep = '')
+  f.median = paste(path.work, 'sv_pw_len_median_',i.chr,'.txt', sep = '')
+  
+  df.cnt = df.cnt + read.table(f.cnt, stringsAsFactors = F, header = T, check.names = F)[,-(1:2)]
+  df.mean = df.mean + read.table(f.mean, stringsAsFactors = F, header = T, check.names = F)
+  df.median = df.median + read.table(f.median, stringsAsFactors = F, header = T, check.names = F)
+  
+}
+
+df.mean = df.mean / 5
+df.median = df.median / 5
+
+
+```
+
+```{r}
+
+
+
+v.cnt <- reshape2::melt(df.cnt)
+v.mean <- reshape2::melt(df.mean)
+v.median <-reshape2::melt(df.median)
+
+df.plot = cbind(v.cnt, v.mean[,2])
+df.plot = cbind(df.plot, v.median[,2])
+colnames(df.plot) = c('group', 'cnt', 'mean.len', 'median.len')
+
+
+# ggplot(df.plot, aes(x = mean.len, y = cnt, color = group)) +
+#   geom_point(alpha = 0.1) +
+#   scale_x_log10() +
+#   scale_y_log10() +
+#   theme_minimal()
+
+
+cols = c('#FFECAF','#CDE990','#66bb6a', '#3e8c4c', '#cca64e', '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink')
+names(cols) = colnames(df.mean)
+
+
+summary.cnt <- aggregate(cnt ~ group, data = df.plot, FUN = mean)
+summary.len <- aggregate(mean.len ~ group, data = df.plot, FUN = median)
+
+mean.pw.len.sv = mean(summary.cnt$cnt[idx.remain] * summary.len$mean.len[idx.remain])
+mean.pw.cnt.sv = round(sum(summary.cnt$cnt))
+
+# 
+# p = ggplot(df.plot, aes(x = group, y = cnt, color = group)) +
+#   geom_jitter(alpha = 0.2, width = 0.3) +
+#   # scale_x_log10() +
+#   scale_y_log10() +
+#   theme_minimal() +
+#   xlab('Length of SVs') +
+#   ylab('Count') + 
+#   stat_summary(fun = mean, geom = "point", size = 3, shape = 16, color = 'black') +
+#   geom_text(data = summary.cnt, aes(x = group, y = cnt, label = round(cnt, 0)), vjust = -1, color = 'black') +
+#   theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+#   guides(color = FALSE) +
+# annotate("text", x = 5,  y = max(summary.cnt$cnt), 
+#             label = paste("Mean pw len of SVs:", format(round(mean.pw.len.sv), big.mark = ","), 
+#                           "\nMean pw cnt of SVs:", format(round(mean.pw.cnt.sv), big.mark = ",")),
+#             colour = "black", size=3, alpha=0.6,
+#             hjust = 0,) + 
+#   scale_color_manual(values = cols)
+# 
+# p 
+
+
+
+df.plot$y.tot = df.plot$mean.len * df.plot$cnt
+
+summary.tot <- aggregate(y.tot ~ group, data = df.plot, FUN = mean)
+summary.cnt$y.tot = summary.tot$y.tot
+
+
+p = ggplot(df.plot, aes(x = group, y = y.tot, color = group)) +
+  geom_jitter(alpha = 0.2, width = 0.3) +
+  scale_y_log10() +
+  theme_minimal() +
+  xlab('Length of SVs') +
+  ylab('Cumulative length') + 
+  # stat_summary(fun = mean, geom = "point", size = 3, shape = 16, color = 'black') +
+  geom_text(data = summary.cnt, aes(x = group, y = y.tot, label = round(cnt, 0)), vjust = -1, color = 'black') +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  guides(color = FALSE) +
+annotate("text", x = 5,  y = max(summary.cnt$cnt)/5, 
+            label = paste("Mean pw len of SVs:", format(round(mean.pw.len.sv), big.mark = ","), 
+                          "\nMean pw cnt of SVs:", format(round(mean.pw.cnt.sv), big.mark = ",")),
+            colour = "black", size=3, alpha=0.6,
+            hjust = 0,) + 
+  scale_color_manual(values = cols)
+
+p 
+
+
+pdf(paste(path.figures, 'sv_pw_len_cnt.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+
+
+
+
+
+
+
+

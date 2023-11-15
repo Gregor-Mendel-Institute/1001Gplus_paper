@@ -197,4 +197,24 @@ hist(pos[(pos$V2 == 1) & p.private,]$pan, 1000)
 
 ```
 
+#Lyrata first chromosome merge
+```{r}
+library(ggplot2)
+path.lyrata = '../01_data/lyrata/'
+x1 = readRDS(paste(path.lyrata, 'consensus_2_1_0_direct.rds', sep = ''))
+x1 <- x1[seq(0, nrow(x1), by = 1000), ]
+x1 = x1[x1[,1] != 0,]
+x1 = x1[x1[,2] != 0,]
+
+x1 = as.data.frame(x1)
+
+
+
+ggplot(x1, aes(x=`0`, y=`11B21`)) + 
+  geom_point(color="#79AC78", size=1)  +
+  xlab('ref') + ylab('lyrata') + theme_minimal()
+
+
+```
+
 
