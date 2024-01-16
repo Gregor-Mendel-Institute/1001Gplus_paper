@@ -1,4 +1,4 @@
-## Modifying the genomes from 1001G+ project. 
+## Modifying accession 22001
 - Check the Snakemake pipeline for further details, everything is commented there
 - Old workflow can be found in the workflow_modgenome.md 
 
