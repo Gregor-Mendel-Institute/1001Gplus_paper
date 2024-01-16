@@ -1,0 +1,102 @@
+# Author: Sebastian Vorbrugg
+# Email: sebastian.vorbrugg@tuebingen.mpg.de
+# Date: 16.01.24
+# Description: SVoverlap
+# GitHub: https://github.com/Gregor-Mendel-Institute/1001Gplus_paper
+
+# Tools needed: gfastats, snakemake,
+# - Python 3.5 +
+# - awk
+# - sort
+# - bedtools(multiIntersectBed) https://bedtools.readthedocs.io/en/latest/
+
+
+configfile: "config.yaml"
+
+rule target:
+    input:
+        expand("/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/intersection.{config}.txt", config = config["cutoff"])
+
+
+# Make custom gff to bed format
+rule anna2bed:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/raw_data/SV/svs_v03.gff"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.og.bed"
+    shell:
+        "cut -f 1,4,5 {input} > {output}"
+
+# Modifies BED - remove pangenomic coordinates, changes "0" to TAIR and 220011 to 22001_ChrX_mod2 (the og names)
+rule annabed2names:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.og.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.bed"
+    shell:
+        "./annagram2normal.py -i {input} -o {output}"
+
+# Filter BED
+rule filter_anna:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.bed"
+    shell:
+        "./bed_filter.py -i {input} -o {output}"
+
+
+# Merge graph BED
+rule getgraph:
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.bed"
+    shell:
+        "cat /tmp/global2/svorbrugg/1001GP/scripts/github/github_data/deconstruct/bed/* > {output}"
+
+# Filter graph BED (same as above)
+rule filter_graph:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.bed"
+    shell:
+        "./bed_filter.py -i {input} -o {output}"
+
+
+# Remove those which are too big and make problems
+rule filter_big:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.{config}.bed"
+    shell:
+        "awk '$3 - $2 < {wildcards.config}' {input} > {output}"
+
+# Sort graph BED
+rule sort_graph:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.{config}.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.sort.filter.{config}.bed"
+    shell:
+        "sort -k 1,1 -k2,2n {input} >{output}"
+
+# Sort Anna BED
+rule sort_anna:
+    input:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.sort.bed"
+    shell:
+        "sort -k 1,1 -k2,2n {input} >{output}"
+
+
+# Intersect both approaches
+rule intersect:
+    input:
+        anna = "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.sort.bed",
+        graph = "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.sort.filter.{config}.bed"
+    output:
+        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/intersection.{config}.txt"
+    shell:
+        "/ebio/abt6_projects9/abt6_software/bin/bedtools/bin/multiIntersectBed  -header -i {input.graph} {input.anna} -names graph annagram  > {output}"
