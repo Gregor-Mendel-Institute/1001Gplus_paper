@@ -1,0 +1,10 @@
+data: ../data/input/
+base: ../results/
+total_graph: ../data/input/merged_graphs/chr.chr.gfa
+
+run:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
