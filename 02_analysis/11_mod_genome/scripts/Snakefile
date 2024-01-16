@@ -8,6 +8,7 @@
 # Minimap2: 2.17-r954-dirty
 # Seqkit: v0.11.0
 # fpa: 0.5 Krabby
+# Snakemake: 5.5.3
 
 # Input fold contains all genomes of all accessions
 
