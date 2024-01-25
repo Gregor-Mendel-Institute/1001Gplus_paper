@@ -18,7 +18,7 @@ configfile: "config.yaml"
 
 rule target:
     input:
-        expand(config["base"] + "final_genome/22001.scaffolds_corrected.v2.1.mod.fasta"),
+        expand(config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta"),
         expand(config["base"] + "minidot/22001.{comp}.after.eps", comp = config["comp"]),
         expand(config["base"] + "minidot/22001.{comp}.before.eps", comp = config["comp"]),
 
@@ -102,7 +102,7 @@ rule remove_add:
         bed =  config["base"] + "final_bed/merged_mm.bed",
         genome = config["data"] + "22001.scaffolds_corrected.v2.1.fasta"
     output:
-        config["base"] + "final_genome/22001.scaffolds_corrected.v2.1.mod.fasta"
+        config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta"
     shell:
         "./remove_and_add.py -f {input.genome} -b {input.bed} -o {output}"
 
@@ -130,7 +130,7 @@ rule minidot:
 # Align with random other genomes (after modification)
 rule minidot_paf_after:
     input:
-        ref = config["base"] + "final_genome/22001.scaffolds_corrected.v2.1.mod.fasta",
+        ref = config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta",
         query = config["data"] + "{comp}.scaffolds_corrected.v2.1.fasta"
     output:
         config["base"] + "minidot/22001.{comp}.after.paf"

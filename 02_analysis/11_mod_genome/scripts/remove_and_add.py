@@ -86,7 +86,7 @@ def write_fasta(fasta, filename):
     """
     with open(filename, "w") as file:
         for x in fasta:
-            print(x[0].split("_")[0] + "_" + x[0].split("_")[1] + "_mod", file = file)
+            print(x[0].split("_")[0] + "f_" + x[0].split("_")[1], file = file)
             print(x[1], file = file)
 
 
