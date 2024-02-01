@@ -16,25 +16,25 @@ rule target:
     input:
         expand(config["base"] + "bootstrap/gfastats.bootstrap.txt", run = config["run"]),
         expand(config["base"] + "core/{run}.gfastats.core.txt", run = config["run"]),
-        expand(config["base"] + "window/{run}.gfastats.window.txt", run = config["run"]),
+        expand(config["base"] + "window/{run}.gfastats.window.300000.txt", run = config["run"]),
         expand(config["base"] + "ps/{run}.gfastats.ps.txt", run = config["run"]),
 
 
 # Calculate core and more 
 rule core:
     input:
-        config["data"] + "{run}.90/{run}.fasta.gz.4158095.c2fac19.5c75112.smooth.final.gfa"
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
     output:
         config["base"] + "core/{run}.gfastats.core.txt"
     shell:
-        "gfastats core -g {input} -o {output}"
+        "gfastats core -g {input} -o {output} --pansn '#'"
 
 # Calculate windows (300k was the best in previous runs)
 rule window:
     input:
-        config["data"] + "{run}.90/{run}.fasta.gz.4158095.c2fac19.5c75112.smooth.final.gfa"
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
     output:
-        config["base"] + "window/{run}.gfastats.window.txt"
+        config["base"] + "window/{run}.gfastats.window.300000.txt"
     shell:
         "gfastats window -g {input} -o {output} -s 300000"
 
@@ -46,13 +46,13 @@ rule bootstrap:
     output:
         config["base"] + "bootstrap/gfastats.bootstrap.txt"
     shell:
-        "gfastats bootstrap -g {input} -o {output} --number 20 --pansn _"
+        "gfastats bootstrap -g {input} -o {output} --number 20 --pansn '#'"
 
 
 # Path based stuff 
 rule ps:
     input:
-        config["data"] + "{run}.90/{run}.fasta.gz.4158095.c2fac19.5c75112.smooth.final.gfa"
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
     output:
         config["base"] + "ps/{run}.gfastats.ps.txt"
     shell:

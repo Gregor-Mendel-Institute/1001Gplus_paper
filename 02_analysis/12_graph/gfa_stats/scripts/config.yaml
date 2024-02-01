@@ -1,6 +1,6 @@
 data: ../data/input/
 base: ../results/
-total_graph: ../data/input/merged_graphs/chr.chr.gfa
+total_graph: ../data/input/merge.graphs.gfa
 
 run:
   - chr1

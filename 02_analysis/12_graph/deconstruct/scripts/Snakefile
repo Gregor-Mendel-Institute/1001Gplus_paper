@@ -27,14 +27,14 @@ rule target:
 # This rule takes the longest
 rule deconstruct:
     input:
-       gfa = config["data"] + "{chr}.90/{chr}.fasta.gz.4158095.c2fac19.5c75112.smooth.final.gfa",
+       gfa = config["data"] + "{chr}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa",
     output:
         config["output"] + "deconstruct/vcf/{chr}.{path}_{chr1}.vcf"
     run:
         if {wildcards.path} == {"22001"}:
-            shell("vg deconstruct -t 5 -e -a -p {wildcards.path}_{wildcards.chr1}_mod2 {input.gfa} > {output}")
+            shell("vg deconstruct -t 5 -e -a -P '{wildcards.path}f#1#{wildcards.chr1}' {input.gfa} > {output}")
         else:
-            shell("vg deconstruct -t 5 -e -a -p {wildcards.path}_{wildcards.chr1} {input.gfa} > {output}")
+            shell("vg deconstruct -t 5 -e -a -P '{wildcards.path}#1#{wildcards.chr1}' {input.gfa} > {output}")
 
 # Convert the VCF file to a BED format
 rule vcf2bed:
