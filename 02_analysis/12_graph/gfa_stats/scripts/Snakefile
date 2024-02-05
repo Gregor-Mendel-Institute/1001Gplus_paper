@@ -18,6 +18,7 @@ rule target:
         expand(config["base"] + "core/{run}.gfastats.core.txt", run = config["run"]),
         expand(config["base"] + "window/{run}.gfastats.window.300000.txt", run = config["run"]),
         expand(config["base"] + "ps/{run}.gfastats.ps.txt", run = config["run"]),
+        expand(config["base"] + "stats/{run}.gfastats.stats.txt", run = config["run"]),
 
 
 # Calculate core and more 
@@ -58,8 +59,14 @@ rule ps:
     shell:
         "gfastats ps -g {input} -o {output}"
 
-
-
+# Graph stats stuff 
+rule stats: 
+    input:
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
+    output:
+        config["base"] + "stats/{run}.gfastats.stats.txt"
+    shell:
+        "gfastats stats -g {input} -o {output}"
 
 
 
