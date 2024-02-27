@@ -26,31 +26,17 @@
 
 
 # Error handling
-set -xe
-trap 'previous_command=$this_command; this_command=$BASH_COMMAND' DEBUG
-trap 'handle_exit $? "$previous_command"' EXIT
-
+trap 'handle_error $LINENO $?' ERR
 
 # handle_exit()
 #
-# Function to handle the exit signal.
+# Function to handle the ERR signal.
 #
-# Parameters:
-#   $1: Exit code
-#   $2: Last command
-#
-# Example:
-#      handle_exit $? $last_command
-
-function handle_exit () {
-    local exit_code=$1
-    local command=$2
-
-    # Check if the exit code is non-zero
-    if [ $exit_code -ne 0 ]; then
-        echo "[ERROR] ${command}"
-        echo "failed with exit code $1."
-    fi
+handle_error() {
+    echo "An error occurred in script '$0' on line $1 with exit status $2"
+    echo "Last command executed: ${BASH_COMMAND}"
+    # You can add additional error handling here
+    exit $2
 }
 
 
