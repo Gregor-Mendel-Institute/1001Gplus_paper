@@ -1,0 +1,453 @@
+Annotation	Freq	Accession	Assembly	Annotation2
+45S rDNA	2	1741	Chromosome scaffolds	45S
+5S rDNA	4	1741	Chromosome scaffolds	5S
+Centromere	9	1741	Chromosome scaffolds	centromere
+Transposable element	2	1741	Chromosome scaffolds	ClassII_Helitrons
+Transposable element	2	1741	Chromosome scaffolds	ClassII_TIR
+Other repeat	1	1741	Chromosome scaffolds	repeat_region
+Telomere	6	1741	Chromosome scaffolds	telomere
+None	6	1741	Chromosome scaffolds	NA
+45S rDNA	1	6024	Chromosome scaffolds	45S
+5S rDNA	2	6024	Chromosome scaffolds	5S
+Centromere	11	6024	Chromosome scaffolds	centromere
+Transposable element	5	6024	Chromosome scaffolds	ClassI_LTR
+Transposable element	2	6024	Chromosome scaffolds	ClassI_nonLTR
+Transposable element	1	6024	Chromosome scaffolds	ClassII_Helitrons
+Other repeat	1	6024	Chromosome scaffolds	repeat_region
+Telomere	8	6024	Chromosome scaffolds	telomere
+None	3	6024	Chromosome scaffolds	NA
+45S rDNA	2	6069	Chromosome scaffolds	45S
+Centromere	10	6069	Chromosome scaffolds	centromere
+Plastid	2	6069	Chromosome scaffolds	chloroplast
+Transposable element	4	6069	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	6069	Chromosome scaffolds	ClassII_TIR
+Telomere	8	6069	Chromosome scaffolds	telomere
+None	1	6069	Chromosome scaffolds	NA
+45S rDNA	2	6124	Chromosome scaffolds	45S
+5S rDNA	7	6124	Chromosome scaffolds	5S
+Centromere	14	6124	Chromosome scaffolds	centromere
+Transposable element	1	6124	Chromosome scaffolds	ClassI_LTR
+Telomere	10	6124	Chromosome scaffolds	telomere
+45S rDNA	2	6244	Chromosome scaffolds	45S
+5S rDNA	4	6244	Chromosome scaffolds	5S
+Centromere	12	6244	Chromosome scaffolds	centromere
+Transposable element	1	6244	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	6244	Chromosome scaffolds	ClassII_Helitrons
+Other repeat	1	6244	Chromosome scaffolds	repeat_region
+Telomere	6	6244	Chromosome scaffolds	telomere
+None	5	6244	Chromosome scaffolds	NA
+45S rDNA	1	6909	Chromosome scaffolds	45S
+5S rDNA	7	6909	Chromosome scaffolds	5S
+Centromere	10	6909	Chromosome scaffolds	centromere
+Transposable element	1	6909	Chromosome scaffolds	ClassI_LTR
+Mitochondria	2	6909	Chromosome scaffolds	mitochondria
+Telomere	8	6909	Chromosome scaffolds	telomere
+None	3	6909	Chromosome scaffolds	NA
+45S rDNA	2	6966	Chromosome scaffolds	45S
+5S rDNA	2	6966	Chromosome scaffolds	5S
+Centromere	13	6966	Chromosome scaffolds	centromere
+Transposable element	3	6966	Chromosome scaffolds	ClassI_LTR
+Mitochondria	2	6966	Chromosome scaffolds	mitochondria
+Other repeat	2	6966	Chromosome scaffolds	repeat_region
+Telomere	9	6966	Chromosome scaffolds	telomere
+None	3	6966	Chromosome scaffolds	NA
+45S rDNA	2	8236	Chromosome scaffolds	45S
+5S rDNA	2	8236	Chromosome scaffolds	5S
+Centromere	15	8236	Chromosome scaffolds	centromere
+Transposable element	1	8236	Chromosome scaffolds	ClassII_Helitrons
+Telomere	6	8236	Chromosome scaffolds	telomere
+None	4	8236	Chromosome scaffolds	NA
+45S rDNA	2	9075	Chromosome scaffolds	45S
+5S rDNA	2	9075	Chromosome scaffolds	5S
+Centromere	9	9075	Chromosome scaffolds	centromere
+Transposable element	7	9075	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	9075	Chromosome scaffolds	ClassI_nonLTR
+Transposable element	5	9075	Chromosome scaffolds	ClassII_Helitrons
+Transposable element	2	9075	Chromosome scaffolds	ClassII_TIR
+Other repeat	1	9075	Chromosome scaffolds	repeat_region
+Telomere	8	9075	Chromosome scaffolds	telomere
+None	19	9075	Chromosome scaffolds	NA
+45S rDNA	2	9537	Chromosome scaffolds	45S
+5S rDNA	7	9537	Chromosome scaffolds	5S
+Centromere	11	9537	Chromosome scaffolds	centromere
+Transposable element	2	9537	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	9537	Chromosome scaffolds	ClassII_Helitrons
+Transposable element	1	9537	Chromosome scaffolds	ClassII_TIR
+Telomere	9	9537	Chromosome scaffolds	telomere
+None	7	9537	Chromosome scaffolds	NA
+45S rDNA	1	9543	Chromosome scaffolds	45S
+5S rDNA	6	9543	Chromosome scaffolds	5S
+Centromere	8	9543	Chromosome scaffolds	centromere
+Plastid	2	9543	Chromosome scaffolds	chloroplast
+Transposable element	4	9543	Chromosome scaffolds	ClassI_LTR
+Telomere	9	9543	Chromosome scaffolds	telomere
+45S rDNA	2	9638	Chromosome scaffolds	45S
+5S rDNA	4	9638	Chromosome scaffolds	5S
+Centromere	14	9638	Chromosome scaffolds	centromere
+Transposable element	1	9638	Chromosome scaffolds	ClassI_LTR
+Mitochondria	2	9638	Chromosome scaffolds	mitochondria
+Other repeat	1	9638	Chromosome scaffolds	repeat_region
+Telomere	8	9638	Chromosome scaffolds	telomere
+None	2	9638	Chromosome scaffolds	NA
+45S rDNA	2	9728	Chromosome scaffolds	45S
+5S rDNA	3	9728	Chromosome scaffolds	5S
+Centromere	13	9728	Chromosome scaffolds	centromere
+Plastid	2	9728	Chromosome scaffolds	chloroplast
+Transposable element	2	9728	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	9728	Chromosome scaffolds	ClassII_Helitrons
+Other repeat	4	9728	Chromosome scaffolds	repeat_region
+Telomere	9	9728	Chromosome scaffolds	telomere
+None	12	9728	Chromosome scaffolds	NA
+45S rDNA	2	9764	Chromosome scaffolds	45S
+5S rDNA	6	9764	Chromosome scaffolds	5S
+Centromere	11	9764	Chromosome scaffolds	centromere
+Transposable element	1	9764	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	9764	Chromosome scaffolds	ClassII_Helitrons
+Transposable element	1	9764	Chromosome scaffolds	ClassII_TIR
+Telomere	8	9764	Chromosome scaffolds	telomere
+None	4	9764	Chromosome scaffolds	NA
+45S rDNA	2	9888	Chromosome scaffolds	45S
+5S rDNA	5	9888	Chromosome scaffolds	5S
+Centromere	11	9888	Chromosome scaffolds	centromere
+Transposable element	1	9888	Chromosome scaffolds	ClassII_Helitrons
+Other repeat	1	9888	Chromosome scaffolds	repeat_region
+Telomere	8	9888	Chromosome scaffolds	telomere
+None	2	9888	Chromosome scaffolds	NA
+45S rDNA	2	9905	Chromosome scaffolds	45S
+5S rDNA	8	9905	Chromosome scaffolds	5S
+Centromere	10	9905	Chromosome scaffolds	centromere
+Other repeat	3	9905	Chromosome scaffolds	repeat_region
+Telomere	8	9905	Chromosome scaffolds	telomere
+None	5	9905	Chromosome scaffolds	NA
+45S rDNA	2	9981	Chromosome scaffolds	45S
+5S rDNA	4	9981	Chromosome scaffolds	5S
+Centromere	9	9981	Chromosome scaffolds	centromere
+Telomere	9	9981	Chromosome scaffolds	telomere
+None	2	9981	Chromosome scaffolds	NA
+45S rDNA	2	10002	Chromosome scaffolds	45S
+5S rDNA	2	10002	Chromosome scaffolds	5S
+Centromere	8	10002	Chromosome scaffolds	centromere
+Transposable element	2	10002	Chromosome scaffolds	ClassI_LTR
+Telomere	8	10002	Chromosome scaffolds	telomere
+None	2	10002	Chromosome scaffolds	NA
+45S rDNA	2	10015	Chromosome scaffolds	45S
+5S rDNA	5	10015	Chromosome scaffolds	5S
+Centromere	12	10015	Chromosome scaffolds	centromere
+Telomere	8	10015	Chromosome scaffolds	telomere
+None	3	10015	Chromosome scaffolds	NA
+45S rDNA	1	10024	Chromosome scaffolds	45S
+5S rDNA	4	10024	Chromosome scaffolds	5S
+Centromere	13	10024	Chromosome scaffolds	centromere
+Plastid	2	10024	Chromosome scaffolds	chloroplast
+Transposable element	3	10024	Chromosome scaffolds	ClassI_LTR
+Transposable element	2	10024	Chromosome scaffolds	ClassII_Helitrons
+Transposable element	2	10024	Chromosome scaffolds	ClassII_TIR
+Other repeat	1	10024	Chromosome scaffolds	repeat_region
+Telomere	9	10024	Chromosome scaffolds	telomere
+None	7	10024	Chromosome scaffolds	NA
+45S rDNA	2	22001	Chromosome scaffolds	45S
+5S rDNA	6	22001	Chromosome scaffolds	5S
+Centromere	14	22001	Chromosome scaffolds	centromere
+Transposable element	1	22001	Chromosome scaffolds	ClassI_LTR
+Telomere	8	22001	Chromosome scaffolds	telomere
+None	3	22001	Chromosome scaffolds	NA
+45S rDNA	2	22002	Chromosome scaffolds	45S
+5S rDNA	4	22002	Chromosome scaffolds	5S
+Centromere	15	22002	Chromosome scaffolds	centromere
+Transposable element	1	22002	Chromosome scaffolds	ClassII_Helitrons
+Other repeat	3	22002	Chromosome scaffolds	repeat_region
+Telomere	8	22002	Chromosome scaffolds	telomere
+None	3	22002	Chromosome scaffolds	NA
+45S rDNA	2	22003	Chromosome scaffolds	45S
+5S rDNA	4	22003	Chromosome scaffolds	5S
+Centromere	7	22003	Chromosome scaffolds	centromere
+Transposable element	2	22003	Chromosome scaffolds	ClassI_LTR
+Telomere	8	22003	Chromosome scaffolds	telomere
+None	5	22003	Chromosome scaffolds	NA
+45S rDNA	2	22004	Chromosome scaffolds	45S
+5S rDNA	5	22004	Chromosome scaffolds	5S
+Centromere	9	22004	Chromosome scaffolds	centromere
+Other repeat	2	22004	Chromosome scaffolds	repeat_region
+Telomere	8	22004	Chromosome scaffolds	telomere
+None	2	22004	Chromosome scaffolds	NA
+45S rDNA	2	22005	Chromosome scaffolds	45S
+5S rDNA	5	22005	Chromosome scaffolds	5S
+Centromere	13	22005	Chromosome scaffolds	centromere
+Telomere	8	22005	Chromosome scaffolds	telomere
+None	2	22005	Chromosome scaffolds	NA
+45S rDNA	2	22006	Chromosome scaffolds	45S
+5S rDNA	6	22006	Chromosome scaffolds	5S
+Centromere	11	22006	Chromosome scaffolds	centromere
+Transposable element	2	22006	Chromosome scaffolds	ClassI_LTR
+Transposable element	1	22006	Chromosome scaffolds	ClassII_Helitrons
+Telomere	8	22006	Chromosome scaffolds	telomere
+None	6	22006	Chromosome scaffolds	NA
+45S rDNA	2	22007	Chromosome scaffolds	45S
+5S rDNA	5	22007	Chromosome scaffolds	5S
+Centromere	10	22007	Chromosome scaffolds	centromere
+Telomere	8	22007	Chromosome scaffolds	telomere
+None	7	22007	Chromosome scaffolds	NA
+45S rDNA	17	1741	Unplaced contigs	45S
+5S rDNA	12	1741	Unplaced contigs	5S
+Centromere	75	1741	Unplaced contigs	centromere
+Plastid	6	1741	Unplaced contigs	chloroplast
+Transposable element	5	1741	Unplaced contigs	ClassI_LTR
+Transposable element	2	1741	Unplaced contigs	ClassII_Helitrons
+Mitochondria	8	1741	Unplaced contigs	mitochondria
+Telomere	1	1741	Unplaced contigs	telomere
+None	2	1741	Unplaced contigs	NA
+45S rDNA	16	6024	Unplaced contigs	45S
+5S rDNA	4	6024	Unplaced contigs	5S
+Centromere	62	6024	Unplaced contigs	centromere
+Plastid	8	6024	Unplaced contigs	chloroplast
+Transposable element	5	6024	Unplaced contigs	ClassI_LTR
+Transposable element	3	6024	Unplaced contigs	ClassII_TIR
+Mitochondria	4	6024	Unplaced contigs	mitochondria
+Other repeat	2	6024	Unplaced contigs	repeat_region
+Telomere	6	6024	Unplaced contigs	telomere
+None	6	6024	Unplaced contigs	NA
+45S rDNA	13	6069	Unplaced contigs	45S
+Centromere	90	6069	Unplaced contigs	centromere
+Plastid	5	6069	Unplaced contigs	chloroplast
+Transposable element	4	6069	Unplaced contigs	ClassI_LTR
+Transposable element	1	6069	Unplaced contigs	ClassII_Helitrons
+Transposable element	9	6069	Unplaced contigs	ClassII_TIR
+Mitochondria	5	6069	Unplaced contigs	mitochondria
+Other repeat	1	6069	Unplaced contigs	repeat_region
+Telomere	3	6069	Unplaced contigs	telomere
+None	57	6069	Unplaced contigs	NA
+45S rDNA	43	6124	Unplaced contigs	45S
+5S rDNA	10	6124	Unplaced contigs	5S
+Centromere	68	6124	Unplaced contigs	centromere
+Plastid	4	6124	Unplaced contigs	chloroplast
+Transposable element	6	6124	Unplaced contigs	ClassI_LTR
+Transposable element	1	6124	Unplaced contigs	ClassII_Helitrons
+Transposable element	1	6124	Unplaced contigs	ClassII_TIR
+Mitochondria	4	6124	Unplaced contigs	mitochondria
+Telomere	3	6124	Unplaced contigs	telomere
+None	10	6124	Unplaced contigs	NA
+45S rDNA	28	6244	Unplaced contigs	45S
+5S rDNA	13	6244	Unplaced contigs	5S
+Centromere	91	6244	Unplaced contigs	centromere
+Plastid	3	6244	Unplaced contigs	chloroplast
+Transposable element	14	6244	Unplaced contigs	ClassI_LTR
+Transposable element	2	6244	Unplaced contigs	ClassII_Helitrons
+Transposable element	3	6244	Unplaced contigs	ClassII_TIR
+Mitochondria	4	6244	Unplaced contigs	mitochondria
+Telomere	3	6244	Unplaced contigs	telomere
+None	3	6244	Unplaced contigs	NA
+45S rDNA	25	6909	Unplaced contigs	45S
+5S rDNA	10	6909	Unplaced contigs	5S
+Centromere	43	6909	Unplaced contigs	centromere
+Plastid	4	6909	Unplaced contigs	chloroplast
+Transposable element	2	6909	Unplaced contigs	ClassI_LTR
+Mitochondria	12	6909	Unplaced contigs	mitochondria
+Telomere	6	6909	Unplaced contigs	telomere
+None	38	6909	Unplaced contigs	NA
+45S rDNA	15	6966	Unplaced contigs	45S
+5S rDNA	14	6966	Unplaced contigs	5S
+Centromere	53	6966	Unplaced contigs	centromere
+Plastid	12	6966	Unplaced contigs	chloroplast
+Transposable element	6	6966	Unplaced contigs	ClassI_LTR
+Transposable element	2	6966	Unplaced contigs	ClassII_TIR
+Mitochondria	16	6966	Unplaced contigs	mitochondria
+Other repeat	1	6966	Unplaced contigs	repeat_region
+Telomere	2	6966	Unplaced contigs	telomere
+None	13	6966	Unplaced contigs	NA
+45S rDNA	39	8236	Unplaced contigs	45S
+5S rDNA	2	8236	Unplaced contigs	5S
+Centromere	92	8236	Unplaced contigs	centromere
+Plastid	4	8236	Unplaced contigs	chloroplast
+Transposable element	5	8236	Unplaced contigs	ClassI_LTR
+Mitochondria	6	8236	Unplaced contigs	mitochondria
+Telomere	4	8236	Unplaced contigs	telomere
+None	8	8236	Unplaced contigs	NA
+45S rDNA	18	9075	Unplaced contigs	45S
+5S rDNA	8	9075	Unplaced contigs	5S
+Centromere	74	9075	Unplaced contigs	centromere
+Plastid	1	9075	Unplaced contigs	chloroplast
+Transposable element	8	9075	Unplaced contigs	ClassI_LTR
+Transposable element	1	9075	Unplaced contigs	ClassII_Helitrons
+Transposable element	3	9075	Unplaced contigs	ClassII_TIR
+Mitochondria	8	9075	Unplaced contigs	mitochondria
+Other repeat	2	9075	Unplaced contigs	repeat_region
+Telomere	3	9075	Unplaced contigs	telomere
+None	14	9075	Unplaced contigs	NA
+45S rDNA	13	9537	Unplaced contigs	45S
+5S rDNA	9	9537	Unplaced contigs	5S
+Centromere	59	9537	Unplaced contigs	centromere
+Plastid	3	9537	Unplaced contigs	chloroplast
+Transposable element	2	9537	Unplaced contigs	ClassI_LTR
+Transposable element	1	9537	Unplaced contigs	ClassII_TIR
+Mitochondria	6	9537	Unplaced contigs	mitochondria
+Telomere	8	9537	Unplaced contigs	telomere
+None	15	9537	Unplaced contigs	NA
+45S rDNA	22	9543	Unplaced contigs	45S
+5S rDNA	27	9543	Unplaced contigs	5S
+Centromere	90	9543	Unplaced contigs	centromere
+Plastid	6	9543	Unplaced contigs	chloroplast
+Transposable element	1	9543	Unplaced contigs	ClassI_LTR
+Transposable element	1	9543	Unplaced contigs	ClassII_Helitrons
+Transposable element	1	9543	Unplaced contigs	ClassII_TIR
+Mitochondria	4	9543	Unplaced contigs	mitochondria
+Telomere	4	9543	Unplaced contigs	telomere
+None	8	9543	Unplaced contigs	NA
+45S rDNA	50	9638	Unplaced contigs	45S
+5S rDNA	15	9638	Unplaced contigs	5S
+Centromere	111	9638	Unplaced contigs	centromere
+Plastid	2	9638	Unplaced contigs	chloroplast
+Transposable element	9	9638	Unplaced contigs	ClassI_LTR
+Mitochondria	10	9638	Unplaced contigs	mitochondria
+Other repeat	3	9638	Unplaced contigs	repeat_region
+Telomere	4	9638	Unplaced contigs	telomere
+None	14	9638	Unplaced contigs	NA
+45S rDNA	28	9728	Unplaced contigs	45S
+5S rDNA	41	9728	Unplaced contigs	5S
+Centromere	107	9728	Unplaced contigs	centromere
+Plastid	22	9728	Unplaced contigs	chloroplast
+Transposable element	10	9728	Unplaced contigs	ClassI_LTR
+Transposable element	3	9728	Unplaced contigs	ClassII_Helitrons
+Transposable element	4	9728	Unplaced contigs	ClassII_TIR
+Mitochondria	10	9728	Unplaced contigs	mitochondria
+Other repeat	7	9728	Unplaced contigs	repeat_region
+Telomere	4	9728	Unplaced contigs	telomere
+None	68	9728	Unplaced contigs	NA
+45S rDNA	9	9764	Unplaced contigs	45S
+5S rDNA	11	9764	Unplaced contigs	5S
+Centromere	97	9764	Unplaced contigs	centromere
+Plastid	9	9764	Unplaced contigs	chloroplast
+Transposable element	8	9764	Unplaced contigs	ClassI_LTR
+Mitochondria	10	9764	Unplaced contigs	mitochondria
+Other repeat	1	9764	Unplaced contigs	repeat_region
+Telomere	3	9764	Unplaced contigs	telomere
+None	12	9764	Unplaced contigs	NA
+45S rDNA	31	9888	Unplaced contigs	45S
+5S rDNA	14	9888	Unplaced contigs	5S
+Centromere	48	9888	Unplaced contigs	centromere
+Plastid	2	9888	Unplaced contigs	chloroplast
+Transposable element	2	9888	Unplaced contigs	ClassI_LTR
+Mitochondria	6	9888	Unplaced contigs	mitochondria
+Telomere	4	9888	Unplaced contigs	telomere
+None	19	9888	Unplaced contigs	NA
+45S rDNA	14	9905	Unplaced contigs	45S
+5S rDNA	21	9905	Unplaced contigs	5S
+Centromere	103	9905	Unplaced contigs	centromere
+Plastid	5	9905	Unplaced contigs	chloroplast
+Transposable element	11	9905	Unplaced contigs	ClassI_LTR
+Transposable element	2	9905	Unplaced contigs	ClassII_TIR
+Mitochondria	4	9905	Unplaced contigs	mitochondria
+Other repeat	4	9905	Unplaced contigs	repeat_region
+Telomere	8	9905	Unplaced contigs	telomere
+None	10	9905	Unplaced contigs	NA
+45S rDNA	20	9981	Unplaced contigs	45S
+5S rDNA	12	9981	Unplaced contigs	5S
+Centromere	70	9981	Unplaced contigs	centromere
+Plastid	2	9981	Unplaced contigs	chloroplast
+Transposable element	8	9981	Unplaced contigs	ClassI_LTR
+Mitochondria	10	9981	Unplaced contigs	mitochondria
+Other repeat	1	9981	Unplaced contigs	repeat_region
+Telomere	3	9981	Unplaced contigs	telomere
+None	6	9981	Unplaced contigs	NA
+45S rDNA	8	10002	Unplaced contigs	45S
+5S rDNA	9	10002	Unplaced contigs	5S
+Centromere	52	10002	Unplaced contigs	centromere
+Plastid	4	10002	Unplaced contigs	chloroplast
+Transposable element	9	10002	Unplaced contigs	ClassI_LTR
+Transposable element	1	10002	Unplaced contigs	ClassII_Helitrons
+Transposable element	1	10002	Unplaced contigs	ClassII_TIR
+Mitochondria	8	10002	Unplaced contigs	mitochondria
+Telomere	1	10002	Unplaced contigs	telomere
+None	7	10002	Unplaced contigs	NA
+45S rDNA	49	10015	Unplaced contigs	45S
+5S rDNA	5	10015	Unplaced contigs	5S
+Centromere	52	10015	Unplaced contigs	centromere
+Plastid	2	10015	Unplaced contigs	chloroplast
+Transposable element	4	10015	Unplaced contigs	ClassI_LTR
+Transposable element	3	10015	Unplaced contigs	ClassII_Helitrons
+Transposable element	2	10015	Unplaced contigs	ClassII_TIR
+Mitochondria	4	10015	Unplaced contigs	mitochondria
+Other repeat	1	10015	Unplaced contigs	repeat_region
+Telomere	4	10015	Unplaced contigs	telomere
+None	8	10015	Unplaced contigs	NA
+45S rDNA	23	10024	Unplaced contigs	45S
+5S rDNA	14	10024	Unplaced contigs	5S
+Centromere	35	10024	Unplaced contigs	centromere
+Plastid	17	10024	Unplaced contigs	chloroplast
+Transposable element	10	10024	Unplaced contigs	ClassI_LTR
+Transposable element	1	10024	Unplaced contigs	ClassII_Helitrons
+Transposable element	3	10024	Unplaced contigs	ClassII_TIR
+Mitochondria	6	10024	Unplaced contigs	mitochondria
+Other repeat	1	10024	Unplaced contigs	repeat_region
+Telomere	6	10024	Unplaced contigs	telomere
+None	18	10024	Unplaced contigs	NA
+45S rDNA	34	22001	Unplaced contigs	45S
+5S rDNA	9	22001	Unplaced contigs	5S
+Centromere	164	22001	Unplaced contigs	centromere
+Plastid	21	22001	Unplaced contigs	chloroplast
+Transposable element	6	22001	Unplaced contigs	ClassI_LTR
+Transposable element	1	22001	Unplaced contigs	ClassII_Helitrons
+Mitochondria	10	22001	Unplaced contigs	mitochondria
+Other repeat	1	22001	Unplaced contigs	repeat_region
+Telomere	4	22001	Unplaced contigs	telomere
+None	8	22001	Unplaced contigs	NA
+45S rDNA	17	22002	Unplaced contigs	45S
+5S rDNA	10	22002	Unplaced contigs	5S
+Centromere	191	22002	Unplaced contigs	centromere
+Plastid	7	22002	Unplaced contigs	chloroplast
+Transposable element	7	22002	Unplaced contigs	ClassI_LTR
+Transposable element	5	22002	Unplaced contigs	ClassII_Helitrons
+Transposable element	3	22002	Unplaced contigs	ClassII_TIR
+Mitochondria	10	22002	Unplaced contigs	mitochondria
+Other repeat	9	22002	Unplaced contigs	repeat_region
+Telomere	14	22002	Unplaced contigs	telomere
+None	65	22002	Unplaced contigs	NA
+45S rDNA	16	22003	Unplaced contigs	45S
+5S rDNA	20	22003	Unplaced contigs	5S
+Centromere	43	22003	Unplaced contigs	centromere
+Plastid	9	22003	Unplaced contigs	chloroplast
+Transposable element	1	22003	Unplaced contigs	ClassI_LTR
+Transposable element	4	22003	Unplaced contigs	ClassII_Helitrons
+Transposable element	1	22003	Unplaced contigs	ClassII_TIR
+Mitochondria	4	22003	Unplaced contigs	mitochondria
+None	6	22003	Unplaced contigs	NA
+45S rDNA	20	22004	Unplaced contigs	45S
+5S rDNA	21	22004	Unplaced contigs	5S
+Centromere	104	22004	Unplaced contigs	centromere
+Plastid	6	22004	Unplaced contigs	chloroplast
+Transposable element	1	22004	Unplaced contigs	ClassI_LTR
+Transposable element	3	22004	Unplaced contigs	ClassII_TIR
+Mitochondria	5	22004	Unplaced contigs	mitochondria
+Other repeat	4	22004	Unplaced contigs	repeat_region
+Telomere	3	22004	Unplaced contigs	telomere
+None	11	22004	Unplaced contigs	NA
+45S rDNA	28	22005	Unplaced contigs	45S
+5S rDNA	16	22005	Unplaced contigs	5S
+Centromere	58	22005	Unplaced contigs	centromere
+Plastid	7	22005	Unplaced contigs	chloroplast
+Transposable element	2	22005	Unplaced contigs	ClassI_LTR
+Transposable element	1	22005	Unplaced contigs	ClassII_Helitrons
+Transposable element	2	22005	Unplaced contigs	ClassII_TIR
+Mitochondria	4	22005	Unplaced contigs	mitochondria
+Other repeat	2	22005	Unplaced contigs	repeat_region
+Telomere	4	22005	Unplaced contigs	telomere
+None	6	22005	Unplaced contigs	NA
+45S rDNA	6	22006	Unplaced contigs	45S
+5S rDNA	13	22006	Unplaced contigs	5S
+Centromere	33	22006	Unplaced contigs	centromere
+Plastid	6	22006	Unplaced contigs	chloroplast
+Transposable element	6	22006	Unplaced contigs	ClassI_LTR
+Transposable element	2	22006	Unplaced contigs	ClassII_TIR
+Mitochondria	4	22006	Unplaced contigs	mitochondria
+Other repeat	1	22006	Unplaced contigs	repeat_region
+Telomere	8	22006	Unplaced contigs	telomere
+None	11	22006	Unplaced contigs	NA
+45S rDNA	22	22007	Unplaced contigs	45S
+5S rDNA	23	22007	Unplaced contigs	5S
+Centromere	84	22007	Unplaced contigs	centromere
+Plastid	7	22007	Unplaced contigs	chloroplast
+Transposable element	2	22007	Unplaced contigs	ClassI_LTR
+Transposable element	1	22007	Unplaced contigs	ClassII_Helitrons
+Mitochondria	14	22007	Unplaced contigs	mitochondria
+Other repeat	1	22007	Unplaced contigs	repeat_region
+Telomere	2	22007	Unplaced contigs	telomere
+None	18	22007	Unplaced contigs	NA
