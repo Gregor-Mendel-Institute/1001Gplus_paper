@@ -15,33 +15,33 @@ configfile: "config.yaml"
 
 rule target:
     input:
-        expand("/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/intersection.{config}.txt", config = config["cutoff"])
+        expand(config["base"] + "results/SV/intersection_anna_graph.{config}.bed", config = config["cutoff"])
 
 
 # Make custom gff to bed format
 rule anna2bed:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/raw_data/SV/svs_v03.gff"
+        config["data"] + "anna_input/allsvs/merge/svs_v03_anna.gff"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.og.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.bed"
     shell:
         "cut -f 1,4,5 {input} > {output}"
 
 # Modifies BED - remove pangenomic coordinates, changes "0" to TAIR and 220011 to 22001_ChrX_mod2 (the og names)
 rule annabed2names:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.og.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.mod.bed"
     shell:
         "./annagram2normal.py -i {input} -o {output}"
 
 # Filter BED
 rule filter_anna:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.mod.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.mod.filter.bed"
     shell:
         "./bed_filter.py -i {input} -o {output}"
 
@@ -54,11 +54,12 @@ rule getgraph:
         "cat /tmp/global2/svorbrugg/1001GP/scripts/github/github_data/deconstruct/bed/* > {output}"
 
 # Filter graph BED (same as above)
+# Merge BEDs before
 rule filter_graph:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.bed"
+        config["data"] + "graph_input/all.graph.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.bed"
+        config["base"] + "results/SV_graph/all.graph.filter.bed"
     shell:
         "./bed_filter.py -i {input} -o {output}"
 
@@ -66,37 +67,38 @@ rule filter_graph:
 # Remove those which are too big and make problems
 rule filter_big:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.bed"
+        config["base"] + "results/SV_graph/all.graph.filter.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.{config}.bed"
+        config["base"] + "results/SV_graph/all.graph.filter.{config}.bed"
     shell:
         "awk '$3 - $2 < {wildcards.config}' {input} > {output}"
 
 # Sort graph BED
 rule sort_graph:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.filter.{config}.bed"
+        config["base"] + "results/SV_graph/all.graph.filter.{config}.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.sort.filter.{config}.bed"
+        config["base"] + "results/SV_graph/all.graph.filter+{config}.sort.bed"
     shell:
         "sort -k 1,1 -k2,2n {input} >{output}"
 
 # Sort Anna BED
 rule sort_anna:
     input:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.mod.filter.bed"
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.sort.bed"
+        config["base"] + "results/SV_anna/svs_v04.og.mod.filter.sort.bed"
     shell:
-        "sort -k 1,1 -k2,2n {input} >{output}"
+        "sort -k 1,1 -k2,2n {input} > {output}"
 
 
 # Intersect both approaches
 rule intersect:
     input:
-        anna = "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/svs_v04.mod.filter.sort.bed",
-        graph = "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/graph.sv.sort.filter.{config}.bed"
+        anna = config["base"] + "results/SV_anna/svs_v04.og.mod.filter.sort.bed", 
+        graph = config["base"] + "results/SV_graph/all.graph.filter+{config}.sort.bed"
+
     output:
-        "/tmp/global2/svorbrugg/1001GP/scripts/github/github_data/SV/intersection.{config}.txt"
+        config["base"] + "results/SV/intersection_anna_graph.{config}.bed"
     shell:
         "/ebio/abt6_projects9/abt6_software/bin/bedtools/bin/multiIntersectBed  -header -i {input.graph} {input.anna} -names graph annagram  > {output}"

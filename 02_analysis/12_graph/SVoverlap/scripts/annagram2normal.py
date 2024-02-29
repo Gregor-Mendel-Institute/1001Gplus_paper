@@ -24,10 +24,16 @@ def read_bed(file_bed):
                         data.append(["TAIR10_" + chr, float(ls[1]), float(ls[2])])
                     elif line.startswith("220011"):
                         chr = ls[0].split("_")[1]
-                        data.append(["22001_"+ chr + "_mod2", float(ls[1]), float(ls[2])])
+                        data.append(["22001f_"+ chr, float(ls[1]), float(ls[2])])
                     else:
                         data.append([ls[0], float(ls[1]), float(ls[2])])
-    return data
+
+    data2 = []
+    for x in data: 
+        new_name = x[0].split("_")
+        new_name = new_name[0] + "#1#" + new_name[1]
+        data2.append([new_name, x[1], x[2]])
+    return data2
 
 def write_newBED(data, file_output):
     """
