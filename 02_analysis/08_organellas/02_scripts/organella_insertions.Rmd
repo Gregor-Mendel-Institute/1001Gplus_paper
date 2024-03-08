@@ -1,0 +1,525 @@
+---
+title: "Organella insertions"
+author: "Anna Igolkina"
+output:
+  html_document: # or choose a different output format like pdf_document
+    toc: true     # Enable table of contents
+    toc_depth: 2  # Table of contents depth (how many levels of nesting)
+    theme: "united" # Formatting theme (you can choose a different one)
+    highlight: tango # Code highlighting style (e.g., tango, espresso, zenburn)
+---
+
+This notebook represents 
+*) the extraction of positions of organelles' insertions (mitochondria and chloroplasts), 
+*) attribution of common IDs to them, and 
+*) blasting the insertions against each other to check for similarity. 
+
+Moreover, it shows the similarity between organelles' insertions and real mitochondrial and chloroplast genomes.
+
+
+# Setup
+All paths are relative to the directory of the script.
+.
+├── 01_data_common
+│   ├── 01_tair10
+│   ├── 02_annot_denovo
+│   └── 03_annot_repeat
+└── 02_analysis
+    └── 01_organellas
+        ├── 01_data
+        └── 02_scripts   <------------ This is the working directory now
+
+## Paths and libs
+```{r}
+library(ggplot2)
+path.organellas = '../01_data/'
+path.figures = '../03_figures/'
+
+path.proj = '../../../'
+path.tair = paste(path.proj, '01_data_common/01_tair10/', sep ='')
+path.annot = paste(path.proj, '01_data_common/03_annot_repeat/', sep = '')
+path.aln = paste(path.proj, '01_data_common/04_alignment/', sep = '')
+path_genomes = paste(path.proj,'02_analysis/02_alignment/pb_chromosomes/', sep = '')
+
+```
+
+
+## Paths on arriam
+```{r}
+# path.aln = '/home/anna/storage/arabidopsis/pacbio/cmp_all/'
+# path.genomes = '/home/anna/storage/arabidopsis/pacbio/pb_chromosomes/'
+```
+
+
+# Find common insertions
+## Get annotation
+```{r}
+
+folder.names <- list.dirs(path.annot, full.names = FALSE, recursive = FALSE)
+folder.names = setdiff(folder.names, '22001')  # remove wrong accession
+
+types = c('mitochondria', 'chloroplast')
+
+df.all = c()
+for(i.type in types){
+  
+  df.mit = c()
+  for(acc in folder.names){
+    file.ann = paste(path.annot, acc, '/', acc, '.Repeats_TEanno.gff3', sep = '')
+    if(!file.exists(file.ann)) next
+    ann = read.table(file.ann, stringsAsFactors = F)
+    ann = ann[ann$V3 == i.type,]
+    idx = grep("Chr", ann$V1, invert = TRUE)
+    if(length(idx) > 0) ann = ann[-idx,]
+    ann$chr <- sub("^.*Chr(\\d+).*", "\\1", ann$V1)
+    ann$acc = acc
+    df.mit = rbind(df.mit, ann[,c('V4', 'V5', 'acc', 'chr')])
+  }
+  
+  df.mit$len = abs(df.mit$V4 - df.mit$V5 + 1)
+  
+  df.mit = df.mit[order(df.mit$V4),]
+  df.mit = df.mit[order(df.mit$acc),]
+  df.mit = df.mit[order(df.mit$chr),]
+  
+  # Merging if the gap is smaller than the length of the annotated fragment
+  df.mit$merge = 0
+  for(irow in 2:nrow(df.mit)){
+    if((df.mit$acc[irow] == df.mit$acc[irow-1]) & 
+       (df.mit$chr[irow] == df.mit$chr[irow-1]) & 
+       (df.mit$V4[irow] - df.mit$V5[irow-1] < max(df.mit$len[irow], df.mit$len[irow-1]))){
+        df.mit$merge[irow] = 1
+    }
+  }
+  
+  for(irow in nrow(df.mit):2){
+    if(df.mit$merge[irow] == 1){
+      df.mit$V5[irow - 1] = df.mit$V5[irow]
+    }
+  }
+  df.mit = df.mit[df.mit$merge == 0,]
+  df.mit$len = abs(df.mit$V4 - df.mit$V5 + 1)
+  df.mit$type = i.type
+  df.all = rbind(df.all, df.mit)
+}
+
+# Sorting
+df.all = df.all[order(df.all$V4),]
+df.all = df.all[order(df.all$chr),]
+df.all = df.all[order(df.all$type),]
+df.all = df.all[, colnames(df.all) != 'merge']
+
+saveRDS(df.all, paste(path.organellas, 'organellas.rds', sep = ''))
+write.table(df.all, paste(path.organellas, 'organellas.txt', sep = ''), 
+            quote = F, col.names = T, row.names = F, sep = '\t')
+
+
+```
+
+
+## Get pangenome positions
+```{r}
+
+df.org = readRDS(paste(path.organellas, 'organellas.rds', sep = ''))
+df.org$pan.b = 0
+df.org$pan.e = 0
+
+for(i.chr in 1:5){
+  v = readRDS(paste(path.aln, 'val_common_chr_', i.chr, '_ref_add.rds',sep = ''))
+  
+  idx = which(df.org$chr == i.chr)
+  
+  for(irow in idx){
+    acc = df.org$acc[irow]
+    tmp = which(v[,acc] == df.org$V4[irow])
+    if(length(tmp) == 0) tmp = 0
+    df.org[irow, 'pan.b'] = tmp
+    tmp = which(v[,acc] == df.org$V5[irow])
+    if(length(tmp) == 0) tmp = 0
+    df.org[irow, 'pan.e'] = tmp
+  }
+  rm(v)
+  
+}
+saveRDS(df.org, paste(path.organellas, 'organellas_pan.rds', sep = ''))
+write.table(df.org, paste(path.organellas, 'organellas_pan.txt', sep = ''), 
+            quote = F, col.names = T, row.names = F, sep = '\t')
+
+```
+
+
+## Predict organellas' IDs
+```{r}
+df.org = readRDS(paste(path.organellas, 'organellas_pan.rds', sep = ''))
+df.org$id = 0
+df.org$id[1] = 1
+for(irow in 2:nrow(df.org)){
+  # if(irow == 4) stop()
+  b1 = df.org$pan.b[irow]
+  e1 = df.org$pan.e[irow]
+  
+  if(b1*e1 == 0){
+    df.org$id[irow] = -(max(abs(df.org$id))+1)
+    next
+  }  
+  if(b1 > e1){
+    tmp = b1
+    b1 = e1
+    e1 = tmp
+  }
+  
+  id.overlap = 0
+  idx.start = min(which((df.org$chr == df.org$chr[irow])&(df.org$type == df.org$type[irow])))
+  if(idx.start != irow){
+    for(jrow in idx.start:(irow-1)){
+      b2 = df.org$pan.b[jrow]
+      e2 = df.org$pan.e[jrow]
+      if(b2 > e2){
+        tmp = b2
+        b2 = e2
+        e2 = tmp
+      }
+      if(b2*e2 == 0) next
+      if (b1 <= e2 && b2 <= e1) {
+        id.overlap = jrow
+        break
+      }
+    }
+  }
+  
+  if(id.overlap == 0){
+    df.org$id[irow] = max(abs(df.org$id)) + 1
+  } else {
+    df.org$id[irow] = df.org$id[id.overlap]
+  }
+  
+}
+write.table(df.org, paste(path.organellas, 'organellas_pan_preid.txt', sep = ''), 
+            quote = F, col.names = T, row.names = F, sep = '\t')
+
+```
+
+
+
+# BLAST fragments against each other
+## Get sequences from organellas
+```{r}
+
+df.org = read.table(paste(path.organellas, 'organellas_pan_preid.txt', sep = ''), stringsAsFactors = F, header = T)
+df.org = df.org[order(df.org$pan.b),]
+df.org = df.org[order(df.org$acc),]
+df.org = df.org[order(df.org$chr),]
+
+file.mit.seq = paste(path.organellas, 'organellas.fasta', sep = '')
+
+write('', file = file.mit.seq, append = F)
+for(irow in 1:nrow(df.org)){
+  print(irow)
+  if(irow == 1){
+    x = seqinr::read.fasta(paste(path.genomes, df.org$acc[irow], '_chr', df.org$chr[irow], '.fasta', sep = ''))[[1]]
+  } else {
+    if((df.org$acc[irow] != df.org$acc[irow-1])|(df.org$chr[irow] != df.org$chr[irow-1])){
+      x = seqinr::read.fasta(paste(path.genomes, df.org$acc[irow], '_chr', df.org$chr[irow], 
+                                   '.fasta', sep = ''))[[1]]
+    }
+  }
+  write(paste('>acc',  df.org$acc[irow], df.org$chr[irow],df.org$V4[irow], 
+              df.org$V5[irow], df.org$len[irow], df.org$type[irow], df.org$id[irow],
+              sep = '|'), file = file.mit.seq, append = T)
+  seq = toupper(paste0(x[df.org$V4[irow]:df.org$V5[irow]], collapse = ''))
+  write(seq,file = file.mit.seq, append = T)
+ 
+}
+
+
+```
+
+## Run BLAST
+```{r}
+message('Run Blast here')
+
+file.mit.seq = paste(path.organellas, 'organellas.fasta', sep = '')
+system2("bash", args = c("blast_organella.sh", file.mit.seq, file.mit.seq))
+
+```
+
+
+
+
+#  Define ID for some of the insertions - by hands!
+```{r}
+stop('Define ID for some of the insertions - by hands!')
+file.org.idx = paste(path.organellas, 'organellas_pan_ids.txt', sep = '')
+message(paste('Resulting file', file.org.idx))
+```
+
+# START HERE!
+## Visualise organella fragments on chromosomes
+```{r}
+
+source('../../05_synteny/02_scripts/func_visualise_synteny.R')
+path.syn.figures = '../../05_synteny/03_figures/'
+
+df.org = read.table(file.org.idx, stringsAsFactors = F, header = 1)
+
+
+for(i.chr in 1:5){
+  p = readRDS(paste(path.syn.figures, 'gg_fig_synteny_alignment_chr', i.chr, '.pdf', sep = ''))
+
+  p_build <- ggplot2::ggplot_build(p)
+  accs <- p_build$layout$panel_params[[1]]$y.sec$get_labels()
+
+  df.org.chr = df.org[df.org$chr == i.chr,]
+  df.org.chr$acc.val = as.numeric(factor(df.org.chr$acc, levels = accs))
+  
+  
+  cols.org = colorRampPalette(c("#5F264A","#2D4356",'#2E4F4F',"#562B08"))(28)
+  names(cols.org) = c(accs[seq(1, length(accs), by = 2)], accs[seq(2, length(accs), by = 2)])
+  cols.org = cols.org[as.character(df.org.chr$acc)]
+  p.org = p + geom_point(data = df.org.chr,
+                 aes(x=V4, y=acc.val), color=cols.org) +
+    # geom_text(data = df.mit.chr, aes(x = V5, y = acc.val, label = len), vjust = -0.5)
+  geom_text_repel(data = df.org.chr, aes(x = V4,
+                        y = acc.val,
+                        label = len), size = 3, box.padding = 0.5, point.padding = 0.2,
+                   max.overlaps = 20, color=cols.org) + facet_grid(type ~ .)
+  
+# p.org
+  
+  pdf(paste(path.figures, 'fig_synteny_chr',i.chr,'_organella.pdf', sep = ''), width = 7, height = 10)
+  print(p.org)     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+}
+
+
+```
+
+## Organella statisticks
+```{r}
+message(paste('Total number of insertions: ', length(unique(df.org$id_new)), sep = ''))
+cnt.occure = table(table(df.org$id_new))
+message(paste('Number of singletons: ', cnt.occure[names(cnt.occure) == '1'], sep = ''))
+message(paste('Number of doubletons: ', cnt.occure[names(cnt.occure) == '2'], sep = ''))
+
+
+df.orf.cnt = data.frame(cnt = tapply(df.org$id_new, df.org$id_new, length),
+                        len = round(tapply(df.org$len, df.org$id_new, mean)),
+                        type = tapply(df.org$type, df.org$id_new, unique))
+df.orf.cnt$cnt = factor(df.orf.cnt$cnt, levels = 1:max(df.orf.cnt$cnt))
+
+p = ggplot(df.orf.cnt, aes(x = cnt, y = len, color=type)) +
+  geom_jitter(width = 0.2, height = 0, alpha = 0.5) +
+  theme_minimal() + scale_y_log10() + xlab('Frequency of presence') + ylab('Length') +
+  scale_colour_manual(values = c("mitochondria" = "#D83F31", "chloroplast" = "#3085C3")) +
+  theme(legend.position = c(0.95, 0.95), legend.justification = c("right", "top"),
+        legend.title = element_blank(),
+        legend.background = element_rect(fill = "white", colour = "#7D7C7C", size = 0.5))
+p
+
+pdf(paste(path.figures, 'fig_organella_stat.pdf', sep = ''), width = 5, height = 4)
+print(p)    
+dev.off()
+
+```
+
+
+
+# IN PROGRESS
+```{r}
+stop('The next code is in progress')
+```
+
+
+## Plot organellas vs fragments
+```{r}
+library(gridExtra)
+library(grid)
+
+source('/Users/anna/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/mobilome/synteny_infer.R')
+bl = read.table('/Volumes/Samsung_T5/vienn/tair/out_mit_tair.txt')
+m.fasta = seqinr::read.fasta('/Volumes/Samsung_T5/vienn/tair/TAIR10_chrM.fas')
+
+mit.names = unique(bl$V1)
+base.len = length(m.fasta[[1]])
+
+bl = setDir(bl, base.len)
+p.list = list()
+for(name in mit.names){
+  p.list[[name]] = plotSyntenyBlocks(bl[bl$V1 == name,], base.len)  + ylim(0,base.len) + xlab(name)
+}
+
+# p.list[[5]]
+
+pdf('/Volumes/Samsung_T5/vienn/tair/out_mit_tair.pdf', width = 30, height = 20)
+grid.arrange(grobs = p.list, ncol = ceiling(sqrt(length(p.list)))) # Write the grid.arrange in the file
+dev.off() # Close the file
+
+
+```
+
+# Visualise MAS around org.fragments
+SERVER
+```{r}
+
+path.work = '../cmp_all/'
+path.out = paste(path.work, 'tmp/', sep = '')
+if (!file.exists(path.out))  dir.create(path.out)
+
+i.chr = 4
+file = paste(path.work,'seq_aln_chr_',i.chr,'_ref_add.rds', sep = '')
+s.init = readRDS(file)
+
+
+v = readRDS(paste(path.work, 'val_common_chr_', i.chr, '_ref_add.rds', sep = ''))
+
+p1 = 2555360
+p2 = 2616876
+acc = '9764'
+
+p1 = 5543981
+p2 = 5544277
+acc = '22005'
+
+p1 = 8962887
+p2 = 8963231
+acc = '22007'
+  
+
+
+p1 = 12245683
+p2 = 12245974
+acc = '22007'
+
+
+p1 = which(v[,acc] == p1)
+p2 = which(v[,acc] == p2)
+
+shift = 2000
+pos = (p1-shift):(p2+shift)
+
+f.fasta = paste(path.out, 'sv_chr4_1_',p1,'_',p2,'.fasta', sep = '')
+
+s = s.init[pos,]
+print('Write')
+write('', file=f.fasta, append=F)
+for(i in 1:ncol(s)){
+  # print(i)
+  s.tmp = unlist(s[,i])
+  write(paste('>seq_', colnames(v)[i], sep = ''), file=f.fasta, append=T)
+  write(toupper(paste0(s.tmp, collapse = '')), file=f.fasta, append=T)
+}  
+
+
+```
+
+## Readt SVs
+```{r}
+
+
+
+path.sv = '/Volumes/Samsung_T5/vienn/work_sv/'
+sv.pos.beg = read.table(paste(path.sv, 'svs_all_beg_pos_v03.txt', sep = ''), stringsAsFactors = F,check.names=FALSE)
+sv.pos.end = read.table(paste(path.sv, 'svs_all_end_pos_v03.txt', sep = ''), stringsAsFactors = F,check.names=FALSE)
+
+sv.chr = as.numeric(sapply(strsplit(rownames(sv.pos.end), "_"), function(x) x[2]))
+
+file.sv.all = 'sv_all_events.rds'
+sv.all = readRDS(paste(path.sv, file.sv.all, sep = ''))
+rownames(sv.all) = sv.all$gr
+
+
+i.chr = 4
+acc = '6909'
+p1 = 464799
+p2 = 465109
+
+
+i.chr = 4
+acc = '9764'
+p1 = 2555360
+p2 = 2616876
+
+p1 = 12245683
+p2 = 12245974
+acc = '22007'
+
+idx = which((sv.pos.beg[,acc] <= p1) & (sv.pos.end[,acc] >= p2) & (sv.chr == i.chr) &(sv.pos.beg[,acc]!=0)&(sv.pos.end[,acc]!=0))
+
+sv.name = rownames(sv.pos.beg)[idx]
+
+sv.all[sv.name,]
+
+
+
+```
+
+## Vilualise the alignment
+```{r}
+
+
+path.msa = paste(path.sv, 'organellas/', sep = '')
+f = 'sv_chr4_1_664210_675923.fasta'  # positions 1
+
+f = 'sv_chr4_1_8308853_8309149.fasta'  # position 3
+f = 'sv_chr4_1_14215833_14216177.fasta'  # position 4
+f = 'sv_chr4_1_19264136_19264427.fasta'  # position 5
+
+file.msa = paste(path.msa, f, sep = '')
+seqs <- Biostrings::readDNAStringSet(file.msa)
+
+
+seqs.mx = matrix('', nrow=length(seqs), ncol=length(seqs[[1]]))
+for(i in 1:length(seqs)){
+  s = toupper(strsplit(as.character(seqs[[i]]), '')[[1]])
+  seqs.mx[i,] = s
+}
+rownames(seqs.mx) = names(seqs)
+# 
+# x = match(get_taxa_name(g.tree), accessions)
+# x = x[!is.na(x)]
+# seqs.mx = seqs.mx[x,]
+
+# Преобразование данных в датафрейм
+df <- reshape2::melt(seqs.mx)
+df$Var1 = factor(df$Var1, levels = rev(rownames(seqs.mx)))
+df$Var2 = as.numeric(df$Var2)
+
+sv.type = c('meSE', 'seSV')
+
+g.msa = ggplot(df, aes(x = Var2, y = Var1, fill = value)) + 
+  geom_tile() +
+  scale_fill_manual(values = c("A" = "#8ACD9D", "C" = "#EE7571", "G" = "#7E9CC8", "T" = "#FFD97C", '-'='#EEEDEF')) +
+  theme_bw() + 
+  # xlim(0, ncol(seqs.mx)+1) + 
+  scale_x_continuous(limits = c(0, ncol(seqs.mx)+1), expand = c(0, 0)) +
+  theme(
+    # panel.grid = element_blank(),
+        panel.border = element_blank()) + ylab('') + 
+  # xlab(paste(sv.me.long[k,'gr'], sv.type[sv.me.long[k,'single']+1], sep = ': ')) + 
+  theme(legend.position = "none")
+
+# g.msa
+
+f.pdf = gsub("fasta", "pdf", f)
+
+pdf(paste(path.msa, f.pdf, sep = ''), width = 9, height = 4)
+print(g.msa)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+# FOR PAPER
+```{r}
+file.organellas = '../01_data/organellas_pan_ids.txt'
+data = read.table(file.organellas, stringsAsFactors = F, header = T)
+
+length(unique(data$id_new))
+
+length(unique(data$id_new[data$len > 1000]))
+
+
+sum(table(data$id_new[data$len > 1000]) == 1)
+
+```
+
