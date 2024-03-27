@@ -4,38 +4,67 @@ title: "Graph of TEs"
 output: null_document
 ---
 
+# Utils
+```{r}
+source('../../../../pannagram/utils/utils.R')
+
+```
+
 
 # Setup
 ```{r, message=FALSE}
-# library(ggplot2)
-# library(reshape2)
-library(ggpattern)
-library(viridis)
-library(colorRamps)
-library(gridExtra)
-library(ggplot2)
-library('igraph')
-library(ggnet)
-library(network)
-library(khroma)  #colour
-library(dplyr)
-library(ggpubr)
-library(Biostrings)
+packages <- c("ggpattern", 
+              "viridis", 
+              "colorRamps", 
+              "gridExtra", 
+              "ggplot2", 
+              "igraph", 
+              "network", 
+              "khroma", 
+              "dplyr", 
+              "ggpubr", 
+              "Biostrings")
 
-source('similarity.R')
-source('graph_refinement.R')
-source('dotplot.R')
-source('msaplot.R')
+sapply(packages, load.library)
+
+
+if (!require("ggnet", character.only = TRUE, quietly = TRUE)) {
+    load.library("devtools")
+    devtools::install_github("briatte/ggnet")
+}
+library(ggnet)
+
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager", quiet = TRUE)
+# BiocManager::install("Biostrings")
+
+
+path.base = '../../../'
+
+path.pannagram = paste(path.base, '../pannagram/', sep = '')
+
+source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
+source(paste(path.pannagram, 'sv/graph_refinement.R', sep = ''))
+source(paste(path.pannagram, 'utils/utils.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/orfplot.R', sep = ''))
+
+# source('similarity.R')
+# source('graph_refinement.R')
+# source('dotplot.R')
+# source('msaplot.R')
 
 sunset <- colour("sunset")
 discrete_rainbow <- colour("discrete rainbow")
 
-path.base = '../../../'
-path.work = paste(path.base, '02_analysis/04_sv/01_data/', sep = '')
-path.tair = paste(path.base, '01_data_common/01_tair10/', sep = '')
-path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
-path.svs = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', sep = '')
-# path.genes = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes/', sep = '')
+path.analysis = paste(path.base, '02_analysis/04_sv/', sep = '')
+path.work = paste(path.analysis, '01_data/', sep = '')
+path.figures = paste(path.analysis, '03_figures/', sep = '')
+
+path.svs = paste(path.base, '01_data/04_annotation/02_pannagram/svs/', sep = '')
+path.tair = paste(path.base, '01_data/09_tair10/', sep = '')
+
 
 # sim.cutoff = 0.9
 
@@ -67,15 +96,18 @@ fam.palette['Unassigned'] = 'grey'
 fam.palette['Mix'] = 'grey20'
 fam.palette['Mix with Helitron'] = '#266D98'
 fam.palette['Helitron'] = '#BCACDE'
+fam.palette['RC/Helitron'] = '#BCACDE'
 fam.palette["LTR/Copia"] = '#BFDB38'
 fam.palette["LTR/Gypsy"] = '#54B435'
 fam.palette["DNA/HAT"] = '#F9B5D0'
 fam.palette["DNA+"] = '#C8658C'
 fam.palette["DNA"] = '#C8658C'
+fam.palette["DNA/Pogo"] = '#C8658C'
 fam.palette["DNA/MuDR"] = '#971549'
 
 
 fam.palette["LINE"] = '#FFC26F'
+fam.palette["LINE/L1"] = '#FFC26F'
 fam.palette["RathE1/2/3_cons"] = '#C38154'
 fam.palette["SINE"] = '#884A39'
 fam.palette["TEG"] = '#4E3636'
@@ -184,9 +216,9 @@ p = ggplot(df.query, aes(x = len, fill = s.hits, color = s.hits)) +
 
 p
 
-pdf(paste(path.figures, 'tes_self_blast_len_density.pdf', sep = ''), width = 5, height = 4)
-print(p)     # Plot 1 --> in the first page of PDF
-dev.off()
+# pdf(paste(path.figures, 'tes_self_blast_len_density.pdf', sep = ''), width = 5, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
 
 table(df.query$val.hits)
@@ -555,9 +587,13 @@ b.graph.names = network.vertex.names(g.part)
 ```{r}
 
 set.seed(20)
+
+g.part %v% "colors" = g.nodes.fam[b.graph.names]
+g.part %v% "node.size" = g.nodes.cnt[b.graph.names]
+
 p <- ggnet2(g.part, label = F, edge.color = "black", 
-            node.size = g.nodes.cnt[b.graph.names], 
-            color = g.nodes.fam[b.graph.names],
+            node.size = "node.size",
+            color = "colors",
             palette = fam.palette,
             # mode = "kamadakawai"
             ) 
@@ -934,14 +970,7 @@ sv.se$fam <- gsub("Helitron/.*", "Mix with Helitron", sv.se$fam)
 
 sv.se$te = factor(sv.se$te, levels = c('isTE', 'isTEpart', 'hasTE', 'hasTEpart', 'noTE'))
 
-
-
-```
-
-## Read SV fasta
-```{r}
-
-sv.seqs = seqinr::read.fasta(paste(path.svs, 'sv_pangen_seq_sv_big.fasta', sep = ''))
+sv.seqs = readFastaMy(paste(path.svs, 'sv_pangen_seq_sv_big.fasta', sep = ''))
 
 ```
 
@@ -1220,8 +1249,140 @@ sv.graph$nodes.traits$indel <- traitsSeqToNode(sv.graph$nodes,
                                               )[sv.graph$nodes.traits$node]
 
 ```
+### EXAMPLE: MIX
+```{r}
+
+# Find a bridge-node
+
+edges.fam = cbind(sv.graph$nodes.traits[sv.graph$edges[,1],]$fam, 
+                  sv.graph$nodes.traits[sv.graph$edges[,2],]$fam)
+
+edges.fam = cbind(edges.fam, sv.graph$edges[,])
+edges.fam = edges.fam[rowSums(is.na(edges.fam)) == 0,]
+
+edges.fam = edges.fam[edges.fam[,1] != edges.fam[,2],]
+edges.fam = edges.fam[order(edges.fam[,3]),]
+
+idx.inner = idxDuplicates(edges.fam[,3])
+
+edges.fam.target = edges.fam[idx.inner,]
+edges.fam.target = edges.fam.target[order(edges.fam.target[,3]),]
 
 
+N8
+R3251
+N1031
+R3264
+
+
+
+
+node0 = 'R2862' #no
+node0 = 'R2886' #no
+node0 = 'N119' #no
+node0 = 'N790' # no
+
+node0 = 'R1541'
+
+node0 = 'R1516'
+node0 = 'N1010'
+
+node0 = 'N141' # very good
+
+node0 = 'R2315'
+
+node0 = 'R411' # maybe interesting
+node0 = 'R500' # helitron family
+
+node0 = 'R777' # more or less
+
+
+
+node0.in = edges.fam.target[edges.fam.target[,3] == node0,4]
+
+sv1 = sv.graph$nodes$name[sv.graph$nodes$node == node0.in[1]][1]
+sv2 = sv.graph$nodes$name[sv.graph$nodes$node == node0.in[2]][1]
+sv0 = sv.graph$nodes$name[sv.graph$nodes$node == node0][1]
+
+pokaz(sv0, sv1, sv2)
+
+
+dotplot.s(sv.seqs[sv1], sv.seqs[sv2], 15, 12)
+
+dotplot.s(sv.seqs[sv0], sv.seqs[sv1], 15, 12)
+dotplot.s(sv.seqs[sv0], sv.seqs[sv2], 15, 12)
+
+dotplot.s(sv.seqs[sv1], sv.seqs[sv1], 15, 12)
+dotplot.s(sv.seqs[sv2], sv.seqs[sv2], 15, 12)
+
+# sv.on.te = read.table(paste(path.work, 'blast_sv_on_tes.txt', sep = ''), stringsAsFactors = F)
+
+
+df = sv.on.te[sv.on.te$V1 == sv2,c('V2', 'V3', 'V8'),]
+colnames(df) = c('beg', 'end', 'V8')
+df$fam = sapply(df$V8, function(s) strsplit(s, '\\|')[[1]][9])
+orfplot(df, s.color = 'fam', show.legend = T, arrow.size = 0) + 
+  scale_colour_manual(values = fam.palette) 
+
+df = sv.on.te[sv.on.te$V1 == sv1,c('V2', 'V3', 'V8'),]
+colnames(df) = c('beg', 'end', 'V8')
+df$fam = sapply(df$V8, function(s) strsplit(s, '\\|')[[1]][9])
+orfplot(df, s.color = 'fam', show.legend = T, arrow.size = 0) + 
+  scale_colour_manual(values = fam.palette) 
+
+
+orfFinder(sv.seqs[sv2])
+
+```
+
+
+#### On server
+```{r}
+
+sv.se[sv.se$name ==sv2,]
+
+path.work = '../cmp_all/'
+
+x = readRDS(paste(path.work, 'val_common_chr_4_ref_add.rds', sep = ''))
+p1 = which(x[,1] == 11012289)
+p2 = which(x[,1] == 11021812)
+
+p1 = 11012289
+p2 = 11021812
+p1
+p2
+
+path.out = paste(path.work, 'examples/', sep = '')
+if (!file.exists(path.out))  dir.create(path.out)
+
+i.chr = 4
+file = paste(path.work,'seq_aln_chr_',i.chr,'_ref_add.rds', sep = '')
+s.init = readRDS(file)
+
+n.window = 1000
+# n.window = 0
+pos = (p1-n.window):(p2+n.window)
+
+s = s.init[pos,]
+f.fasta = paste(path.out,  'example_',sv2,'_wind_',n.window,'.fasta', sep = '')
+print('Write')
+write('', file=f.fasta, append=F)
+for(i in 1:ncol(s)){
+  # print(i)
+  s.tmp = unlist(s[,i])
+  write(paste('>acc_', colnames(x)[i], sep = ''), file=f.fasta, append=T)
+  write(toupper(paste0(s.tmp, collapse = '')), file=f.fasta, append=T)
+}
+
+v.wnd = x[pos,]
+f.pos = paste(path.out,  'example_',sv2,'_wind_',n.window,'.rds', sep = '')
+saveRDS(v.wnd, f.pos)
+
+
+x[c(min(pos), max(pos)),1]
+# [1] 17476332 17496274
+
+```
 
 
 ### Filtration
@@ -1921,9 +2082,15 @@ big.families$subfam = x[big.families$node]
 # no-TE SV
 ## Construct
 ```{r}
+
+
+
 # sv.se = readRDS(paste(path.svs, 'sv_se.rds', sep = ''))
 
 sv.se.no.te = sv.se$name[(sv.se$te == 'noTE') & (sv.se$len > 50)]
+
+sv.seqs.no.te = sv.seqs[sv.se.no.te]
+writeFastaMy(sv.seqs.no.te, paste(path.svs, 'sv_pangen_seq_no_te.fasta', sep = ''))
 
 bl.file = paste(path.work,'sv_big_on_big.txt', sep = '')
 bl.sv = read.table(bl.file, stringsAsFactors = F)
@@ -1989,13 +2156,11 @@ for(type in types){
 
 sv.memb$prot[sv.memb$prot == 'disease'] = 'defined prot'
 
-
-
+g.part %v% "colors" = sv.memb[g.part.names, 'prot']
 set.seed(239)
 p <- ggnet2(g.part, label = F, edge.color = "black", 
-            # node.size = g.nodes.cnt[b.graph.names], 
             node.size = 1,
-            color = sv.memb[g.part.names,]$prot,
+            color = "colors",
             palette = g.cols,
             # mode = "kamadakawai"
             ) + guides(size = F) + coord_fixed(ratio = 1) +
@@ -2096,27 +2261,388 @@ p
 
 ```
 
+## Non-arabidopsis
+```{r}
+x = readRDS(paste(path.work, 'sv_proteins_no_te_blast.rds', sep = ''))
+
+x$org = substr(x$X3, 1, 3)
+
+res = as.matrix(table(x$X1, x$org))
+
+x$sv = paste(sapply(x$X1, function(s) strsplit(s, '\\|')[[1]][1]),
+                    sapply(x$X1, function(s) strsplit(s, '\\|')[[1]][2]), sep = '|')
+y = x[!duplicated(x$sv),]
+rownames(y) = x$sv[!duplicated(x$sv)]
+
+sv.graphcomp$org = y[names(sv.graphcomp$membership), 'org']
+
+v = tapply(sv.graphcomp$org, sv.graphcomp$membership, function(x){
+  
+  x = x[!is.na(x)]
+  
+  if(length(x) == 0) return(NA)
+  sum(x == 'Ara') / length(x)
+  
+} )
+
+cl.non.ara = which((v <= 0.1) & (!is.na(v)))
+
+
+
+
+table(sv.graphcomp$tag[cl.non.ara])
+
+tmp = cl.non.ara[sv.graphcomp$tag[cl.non.ara] == 'transpos']
+
+sv.graphcomp$csize[tmp]
+
+
+# Which are not Arabidopsis
+g.part %v% "org" = y[g.part.names, 'org'] != 'Ara'
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "black", 
+            node.size = 1,
+            color = "org",
+            palette = 'Set1',
+            # mode = "kamadakawai"
+            )  + coord_fixed(ratio = 1)
+p
+
+
+# Which are not arabidopsis and TEs
+g.part %v% "org" = sv.graphcomp$membership[g.part.names] %in% tmp
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "black", 
+            node.size = 1,
+            color = "org",
+            palette = 'Set1',
+            # mode = "kamadakawai"
+            ) + coord_fixed(ratio = 1) 
+p
+
+cbind(tmp,sv.graphcomp$csize[tmp])
+
+
+g.part %v% "org" = sv.graphcomp$membership[g.part.names] %in% 5
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "black", 
+            node.size = 1,
+            color = "org",
+            palette = 'Set1',
+            # mode = "kamadakawai"
+            ) 
+p
+
+```
+
+# EDTA
+```{r}
+
+```
+
+
+## INTERESTING
+### no prot
+```{r}
+tag.interes = 'no prot'
+# tag.interes = 'transpos'
+
+
+s.tag.interes = gsub(' ', '_', tag.interes)
+
+
+path.candidates = paste(path.work, 'candidates_',s.tag.interes,'/', sep = '')
+if (!dir.exists(path.candidates)) {
+  dir.create(path.candidates)
+}
+
+# names of SV in "no prot" category
+cl.np.prot = which(sv.graphcomp$tag == tag.interes)
+cl.np.prot = table(sv.graphcomp$membership[sv.graphcomp$membership %in% cl.np.prot])
+cl.np.prot = as.numeric(names(cl.np.prot)[cl.np.prot >= 3]) 
+
+
+len.all = c()
+for(i.cl in cl.np.prot){
+  
+  message(i.cl)
+  sv.cl.tmp = names(sv.graphcomp$membership[sv.graphcomp$membership == i.cl])
+  lengths = as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2]))
+  len.med = median(lengths)
+  
+  criteria = abs(lengths - len.med) < len.med*0.1
+  if(sum(criteria) != 0){
+    sv.cl.tmp = sv.cl.tmp[criteria]
+  } else {
+    d = as.matrix(dist(lengths, method = "euclidean"))
+    indices <- which(d < len.med * 0.1, arr.ind = TRUE)
+    tmp.graph <- igraph::make_graph(t(indices), directed = T)
+    tmp.graph <- igraph::simplify(tmp.graph)
+    tmp.comp <- igraph::components(tmp.graph)
+    
+    cl.big = which(tmp.comp$csize == max(tmp.comp$csize))[1]
+    id.cl.tmp = which(tmp.comp$membership %in% cl.big)
+    
+    
+    if(length(id.cl.tmp) != 0){
+      sv.cl.tmp = sv.cl.tmp[id.cl.tmp]
+    } else {
+      sv.cl.tmp = sv.cl.tmp[lengths == min(lengths)]
+    }
+  }
+  
+  len.all = c(len.all,mean(as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2]))))
+  print(as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2])))
+  # next()
+  
+  seqs.tmp = sv.seqs[sv.cl.tmp]
+  
+  # Fix direction
+
+  file.tmp = paste(path.candidates, 'sv_clust_', sprintf("%04d", i.cl), '.fasta', sep = '')
+  if(length(seqs.tmp) > 1){
+    seq1 = seq2nt(seqs.tmp[1])
+    for(i in 2:length(seqs.tmp)){
+      
+      seq2 = seq2nt(seqs.tmp[i])
+      
+      dot.scores = dotScore(seq1, seq2)
+      
+      if(dot.scores[2] > dot.scores[1]){
+        # stop('RC found')
+        pokaz(1, i)
+        seqs.tmp[i] = nt2seq(revCompl(seq2nt(seqs.tmp[i])))
+        dotplot(seq1, seq2, 10, 9)
+      }
+    }
+  }
+  
+  writeFastaMy(seqs.tmp, file.tmp)
+}
+```
+
+
+### transpos
+```{r}
+# tag.interes = 'no prot'
+tag.interes = 'transpos'
+tag.interes = 'undefined prot'
+
+
+s.tag.interes = gsub(' ', '_', tag.interes)
+
+
+path.candidates = paste(path.work, 'candidates_',s.tag.interes,'/', sep = '')
+if (!dir.exists(path.candidates)) {
+  dir.create(path.candidates)
+}
+
+# names of SV in "no prot" category
+cl.np.prot = which(sv.graphcomp$tag == tag.interes)
+cl.np.prot.cnt = table(sv.graphcomp$membership[sv.graphcomp$membership %in% cl.np.prot])
+cl.np.prot = as.numeric(names(cl.np.prot.cnt)[cl.np.prot.cnt > 3]) 
+
+cl.np.prot.cnt[as.character(cl.np.prot)]
+
+
+len.all = c()
+
+for(i.cl in cl.np.prot){
+  
+  g.part %v% "cluster" = sv.graphcomp$membership[g.part.names] == i.cl
+  set.seed(239)
+  p <- ggnet2(g.part, label = F, edge.color = "black", 
+              node.size = 1,
+              color = "cluster",
+              palette = 'Set2',
+              # mode = "kamadakawai"
+              ) 
+  p
+  
+  pdf(paste(path.candidates, 'graph_sv_clust_', sprintf("%04d", i.cl), '.pdf', sep = ''), width = 5, height = 5)
+  print(p + guides(color = F))     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+}
+```
+
+### Specific component
+```{r}
+i.cl = 69
+message(i.cl)
+sv.cl.tmp = names(sv.graphcomp$membership[sv.graphcomp$membership == i.cl])
+lengths = as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2]))
+pokaz(lengths)
+len.med = median(lengths)
+
+seqs.tmp = sv.seqs[sv.cl.tmp]
+
+
+i1 = 1
+i2 = 5
+s1 = seq2nt(seqs.tmp[i1])
+s2 = seq2nt(seqs.tmp[i2])
+p.dot = dotplot(s1, s2, 15, 13) + xlab(sv.cl.tmp[i1]) + ylab(sv.cl.tmp[i2])
+p.dot
+
+
+# ----  Plots ----
+path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
+path.components = paste(path.figures, 'components_new/', sep = '')
+
+# Plot Dotplot
+pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.cl),'_dot_short.pdf', sep = ''), 
+    width = 3, height = 3)
+print(p.dot)   
+dev.off()
+
+
+# ORFs
+res = orfFinder(nt2seq(seqs.tmp[i1]))
+
+p.orf = orfplot(res$pos)
+p.orf
+
+pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.cl),'_orf.pdf', sep = ''), 
+    width = 4, height = 3)
+print(p.orf)   
+dev.off()
+
+# BLAST MY
+path.components.data = paste(path.figures, 'components_new_data/', sep = '')
+x = read.table(paste(path.components.data, 'comp_',i.cl,'_blast_my.txt', sep = ''), stringsAsFactors = F)
+
+x$sp = sapply(x$V8, function(s) strsplit(s, '\\|')[[1]][1])
+if(i.cl == 5){
+  x = x[x$V1 != "SVgr_2_id_102135|5195:ORF|3446|3763|+|aaLEN|106",]  
+} else {
+  x = x[x$V1 %in% c("SVgr_1_id_100421|5252:ORF|2645|4804|+|aaLEN|720","SVgr_1_id_100421|5252:ORF|431|2455|+|aaLEN|675" ),]
+  
+}
+
+x$shape = as.factor(as.numeric(as.factor(x$sp)) %% 4)
+
+shapes <- c("brap_v3_01"=1  ,   "sweet_orange" =2,    "hibiscus" =3,        "acer_negundo" =4,    "aly_MN47"   =16,
+            "asu_ASM1920280v1" =17, "atal_0" =18     , 'potato'= 15, 'microthlaspi' = 19)
+
+p = ggplot(x, aes(x = V6, y = V7, color = sp, shape = sp)) +
+  geom_point() +
+  # geom_point(alpha = 0.1) +
+  # facet_wrap(~ V1, scales = "free") +
+  facet_grid(rows = vars(sp), cols = vars(V1)) +
+  theme_minimal() + xlab('Identity') + ylab('Coverage') +
+   scale_color_viridis(discrete = TRUE) +
+  scale_shape_manual(values = shapes) +  # Применяем определенные формы
+  theme(strip.text.x = element_text(size = 6), strip.background = element_blank())
+
+p
+pdf(paste(path.components, 'graph_mob_component_', sprintf("%03d", i.cl),'_blast.pdf', sep = ''), 
+    width = 5, height = 8)
+print(p)   
+dev.off()
+
+```
+
+
+```{r}
+criteria = abs(lengths - len.med) < len.med*0.1
+  if(sum(criteria) != 0){
+    sv.cl.tmp = sv.cl.tmp[criteria]
+  } else {
+    d = as.matrix(dist(lengths, method = "euclidean"))
+    indices <- which(d < len.med * 0.1, arr.ind = TRUE)
+    tmp.graph <- igraph::make_graph(t(indices), directed = T)
+    tmp.graph <- igraph::simplify(tmp.graph)
+    tmp.comp <- igraph::components(tmp.graph)
+    
+    cl.big = which(tmp.comp$csize == max(tmp.comp$csize))[1]
+    id.cl.tmp = which(tmp.comp$membership %in% cl.big)
+    
+    
+    if(length(id.cl.tmp) != 0){
+      sv.cl.tmp = sv.cl.tmp[id.cl.tmp]
+    } else {
+      sv.cl.tmp = sv.cl.tmp[lengths == min(lengths)]
+    }
+  }
+  
+  len.all = c(len.all,mean(as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2]))))
+  print(as.numeric(sapply(sv.cl.tmp, function(s) strsplit(s, '\\|')[[1]][2])))
+  # next()
+  
+  seqs.tmp = sv.seqs[sv.cl.tmp]
+  
+  # Fix direction
+
+  file.tmp = paste(path.candidates, 'sv_clust_', sprintf("%04d", i.cl), '.fasta', sep = '')
+  if(length(seqs.tmp) > 1){
+    seq1 = seq2nt(seqs.tmp[1])
+    for(i in 2:length(seqs.tmp)){
+      
+      seq2 = seq2nt(seqs.tmp[i])
+      
+      dot.scores = dotScore(seq1, seq2)
+      
+      if(dot.scores[2] > dot.scores[1]){
+        # stop('RC found')
+        pokaz(1, i)
+        seqs.tmp[i] = nt2seq(revCompl(seq2nt(seqs.tmp[i])))
+        dotplot(seq1, seq2, 10, 9)
+      }
+    }
+  }
+  
+  writeFastaMy(seqs.tmp, file.tmp)
+
+
+```
+
+
+
+```{r}
+
+
+
+
+
+s1 = seq2nt(sv.seqs[sv.cl.tmp[1]])
+s2 = seq2nt(sv.seqs[sv.cl.tmp[4]])
+p.dot = dotplot(s1, s2, 15, 9)
+p.dot
+
+pdf(paste(path.candidates, 'dot_sv_clust_', sprintf("%04d", i.cl), '.pdf', sep = ''), width = 4, height = 4)
+print(p.dot)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+```
+
+
 
 ## No-prot examples
 ```{r}
 
 cl.np.prot = which(sv.graphcomp$tag == 'no prot')
 cl.np.prot = table(sv.graphcomp$membership[sv.graphcomp$membership %in% cl.np.prot])
-cl.np.prot = as.numeric(names(cl.np.prot)[cl.np.prot > 5])
+cl.np.prot = as.numeric(names(cl.np.prot)[cl.np.prot > 2])
 
 cl.np.prot
 
 p.list = list()
-seq.list = list()
+seq.list = c()
 for(i.com in cl.np.prot){
   names = names(sv.graphcomp$membership[sv.graphcomp$membership == i.com])
   names.len = as.numeric(sapply(names, function(s) tail(strsplit(s, '\\|')[[1]], 1)))
   print(names.len)
   
   s = sv.seqs[[names[1]]]
+  ns = length(s)
+  if(!((ns >= 200) & (ns <= 400))) next
+  
   p = dotplot(s, s, 15, 9)
   p.list[[length(p.list) + 1]] = p
-  seq.list[[length(seq.list) + 1]] = s
+  seq.list[paste('id', i.com, sep = '_')] = nt2seq(s)
 }
 
 library(gridExtra)
@@ -2135,6 +2661,13 @@ sv.memb$len <- as.numeric(sapply(sv.memb$name, function(s) strsplit(s, '\\|')[[1
 rownames(sv.se) = sv.se$name
 sv.memb$freq = sv.se[sv.memb$name,]$freq.max
 sv.memb$indel = sv.se[sv.memb$name,]$sin
+
+# Define indel type
+n.cutoff = 3
+n = 28
+sv.memb$sin = 'M'
+sv.memb$sin[sv.memb$freq >= (n - n.cutoff)] = 'D'
+sv.memb$sin[sv.memb$freq <= n.cutoff] = 'I'
 
 
 path.components = paste(path.figures, 'components_new/', sep = '')
@@ -2184,7 +2717,7 @@ for(i.target in comp.target){
                  edge.color = "grey20", 
               # node.size = sv.graph$nodes.traits[g.sub.names,]$cnt, 
               node.size = 7,
-              color = sv.memb[g.sub.names,]$indel,
+              color = indel.new.names[sv.memb[g.sub.names,]$sin],
               mode = 'kamadakawai',
               arrow.gap = 0.04, arrow.size = 3,
               palette = indel.pallete
@@ -2195,7 +2728,9 @@ for(i.target in comp.target){
       guides(color = guide_legend(ncol = 2 )) + 
                    theme(legend.position = "bottom")
   
-  pp = invisible(ggarrange(p.te,
+  
+  pp = invisible(ggarrange(p.te+ annotate("text", x = -Inf, y = Inf, 
+                                           label = i.target, hjust = 0, vjust = 1),
                  p.freq,
                  
                  nrow=1))
@@ -2298,6 +2833,23 @@ dev.off()
 
 ```
 
+#### Separate examples
+```{r}
+
+i.target = 2
+sub.names = names(sv.new.comp$membership)[sv.new.comp$membership == i.target]
+
+i.sv = 1
+message(sub.names[i.sv])
+seq = sv.seqs[[sub.names[i.sv]]]
+
+dotplot(seq, seq, 15, 13)
+dotplot(seq, seq, 15, 10)
+
+
+nt2seq(seq)
+```
+
 
 ```{r}
 
@@ -2311,7 +2863,7 @@ dotplot(seq1,
 ```
 
 
-#### I don't know
+#### I don't know (EDTA)
 ```{r}
 sv.se$freq = sv.se$freq.max
 n.cutoff = 3
@@ -2522,23 +3074,8 @@ for(k in 1:length(tmp.cnt)){
 }
 
 ```
-# Pie-chart of proteins
-```{r}
-library(ggplot2)
 
-data <- data.frame(
-  type = c("no proteins", "TE-related", "Категория 2", "Категория 3", "Категория 4"),
-  value = c(135, 63, 85, 133)
-)
 
-pie.chart <- ggplot(data, aes(x = "", y = value, fill = type)) +
-  geom_bar(stat = "identity", width = 1) +
-  coord_polar("y", start = 0) +
-  theme_void()
-
-pie.chart
-
-```
 
 ## Admixture groups
 ```{r}
