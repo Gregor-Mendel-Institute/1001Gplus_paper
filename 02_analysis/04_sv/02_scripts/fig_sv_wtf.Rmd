@@ -1,6 +1,6 @@
 ---
 title: "Figures for SVs"
-output: null_document
+output: html_notebook
 ---
 
 # Setup
@@ -110,12 +110,12 @@ res.len = c()
 thresholds = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13)
 thresholds = c(0,15,50,100, 1000)
 for(thresh in thresholds){
-  cnt = c(table(sv.all$single[sv.all$len >thresh]))
-  tmp = c(sum(sv.all$len >thresh), cnt, as.numeric(sprintf("%.2f",cnt[2]/cnt[1])))
+  cnt = c(table(sv.all$single[sv.all$len >=thresh]))
+  tmp = c(sum(sv.all$len >=thresh), cnt, as.numeric(sprintf("%.2f",cnt[2]/cnt[1])))
   res.len = rbind(res.len, tmp)
 }
 colnames(res.len) = c('all', 'me', 'se', 'ratio')
-rownames(res.len) = paste('len >', thresholds, 'bp', sep = '')
+rownames(res.len) = paste('len >=', thresholds, 'bp', sep = '')
 rownames(res.len)[1] = 'all SVs'
 
 print(res.len)
@@ -248,6 +248,7 @@ dev.off()
 ## Combined with correspondence
 ```{r}
 
+
 gx = list()
 for(len.min in c(1, 1000)){
   df.plot = sv.all[(sv.all$len >= len.min) & (sv.all$chr == i.chr),]
@@ -261,6 +262,8 @@ for(len.min in c(1, 1000)){
   gx[[length(gx) +1]] = g
 }
 
+
+
 pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) , 
           gx[[1]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + xlab('') + 
             theme(legend.position = "none"), 
@@ -271,6 +274,8 @@ pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),
           nrow=3, heights = c(1, 0.2, 0.2))
 
 pp
+
+
 
 pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) , 
           gx[[2]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + 
@@ -1469,122 +1474,6 @@ g
 
 ```
 
-# POSITIONS: SVs and TEs
-## Read
-```{r}
-path.edta = '../../../01_data_common/03_annot_repeat/'
-files.edta <- list.files(path = path.edta, pattern = "\\.gff$")
-
-ann.edta = c()
-for(f in files.edta){
-  pokaz(f)
-  ann.tmp = read.table(paste(path.edta, f, sep = ''), stringsAsFactors = F)
-  ann.tmp$acc = gsub("\\.gff$", "", f)
-  ann.edta = rbind(ann.edta, ann.tmp)
-}
-ann.edta$chr = as.numeric(sapply(ann.edta$V1, function(s) strsplit(s, 'Chr')[[1]][2]))
-ann.edta = ann.edta[!is.na(ann.edta$chr),]
-unique(ann.edta$chr)
-
-accessions = unique(ann.edta$acc)
-```
-
-## Processing
-```{r}
-# Remove Tair-10
-sv.sin = sv.se
-sv.sin$tair.bin = (sv.sin[,'0'] > sv.sin$len / 2) * 1
-sv.sin$freq.max = sv.sin$freq.max - (sv.sin$tair.bin == 1) * 1
-sv.sin$freq.min = sv.sin$freq.min - (sv.sin$tair.bin == 0) * 1
-sv.sin = sv.sin[sv.sin$freq.max != 0,]
-sv.sin = sv.sin[sv.sin$freq.min != 0,]
-# Check
-if(length(unique(sv.sin$freq.max + sv.sin$freq.min) )> 1) stop('WRONG number of accessions')
-
-# Remain only extremes
-sv.sin = sv.sin[(sv.sin$freq.max >= 24) | (sv.sin$freq.max <= 3), ]
-
-# Defive insertion-deletion
-sv.sin$insert = (sv.sin$freq.max < 20) * 1
-
-# Remain only TE-parts
-sv.sin = sv.sin[sv.sin$te == 'isTEpart',]
-
-
-sv.beg = sv.pos.beg[sv.sin$gr,]
-sv.end = sv.pos.end[sv.sin$gr,]
-
-
-sv.sin$in.edta = 0
-for(acc in accessions){
-  if(acc == '0') next
-  print(acc)
-  for(i.chr in 1:5){
-    
-    ann.acc = ann.edta[(ann.edta$acc == acc) & (ann.edta$chr == i.chr),]
-    ann.acc = ann.acc[order(ann.acc$V4),]
-    pos.edta = rep(0, 40000000)
-    for(irow in 1:nrow(ann.acc)){
-      pos.edta[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
-    }
-    
-    sv.sin.bin.acc = (sv.sin[,acc] >= sv.sin$len/2) * 1
-    
-    idx.check.insert = (sv.sin$insert == 1) & (sv.sin.bin.acc == 0) & (sv.sin$chr == i.chr)
-    idx.check.delet = (sv.sin$insert == 0) & (sv.sin.bin.acc == 1) & (sv.sin$chr == i.chr)
-    
-    idx.interest = which(idx.check.insert | idx.check.delet)
-    
-    sv.sin.bin.acc = sv.sin.bin.acc[idx.interest]
-    
-    sv.acc = sv.sin[idx.interest,acc]
-    sv.acc.beg = sv.beg[idx.interest,acc]
-    sv.acc.end = sv.end[idx.interest,acc]
-    sv.acc.gr = sv.sin[idx.interest,'gr']
-    sv.acc[sv.acc.beg == 0] = -1
-    sv.acc[sv.acc.end == 0] = -1
-    
-    sv.in.edta = rep(0, length(idx.interest))
-    
-    n.wind = 200
-    for(irow in 1:length(sv.acc)){
-      if(sv.acc[irow] == -1) next
-      
-      
-      if((pos.edta[sv.acc.end[irow]] == 1) | (pos.edta[sv.acc.beg[irow]] == 1)){
-        pos.tmp = c(max(1,(sv.acc.beg[irow] - n.wind)):sv.acc.beg[irow], sv.acc.end[irow]:(sv.acc.end[irow]+n.wind))
-        n.in.te.tmp = sum(pos.edta[pos.tmp])
-        
-        if(n.in.te.tmp > n.wind){
-          sv.in.edta[irow] = 1
-        }
-        
-      }
-      
-    }
-    
-    
-    sv.sin$in.edta[idx.interest] = sv.sin$in.edta[idx.interest] + (sv.in.edta > 0) * 1
-  }
-  
-}
-
-idx = (sv.sin$len < 500) & (sv.sin$te == 'isTEpart')
-idx =  (sv.sin$te == 'isTEpart')
-table(sv.sin$in.edta[idx] > 0, sv.sin$insert[idx])
-
-
-# > table(sv.sin$in.edta[idx] > 0, sv.sin$insert[idx])
-#        
-#                del    insertion
-#   not in TE    370    1207
-#   in TE       1024    653
-
-
-
-```
-
-
 
 # Along chromosomes
 ##  insertions and deletions
@@ -1968,7 +1857,6 @@ pos.gene.mins = rep(0,max.chr.len)
 
 
 ```
-
 
 # Stop
 ```{r}
