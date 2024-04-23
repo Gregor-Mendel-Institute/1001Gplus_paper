@@ -73,7 +73,7 @@ sim.cutoff = 0.85
 
 ```
 
-# Colors
+## Colors
 ```{r}
 
 # ---- Colors of TE content ----
@@ -681,6 +681,7 @@ p.small.type =p + theme(legend.position = "none")
 
 
 ```
+
 ### Plots
 ```{r}
 p.big.type
@@ -972,6 +973,27 @@ sv.se$fam <- gsub("Helitron/.*", "Mix with Helitron", sv.se$fam)
 sv.se$te = factor(sv.se$te, levels = c('isTE', 'isTEpart', 'hasTE', 'hasTEpart', 'noTE'))
 
 sv.seqs = readFastaMy(paste(path.svs, 'sv_pangen_seq_sv_big.fasta', sep = ''))
+
+## GC estimate
+
+rownames(sv.se) = sv.se$gr
+
+sv.gc = c()
+for(irow in 1:length(sv.seqs)){
+  s = toupper(seq2nt(sv.seqs[irow]))
+  sv.gc[irow] = sum((s == 'G') | (s == 'C'))
+}
+names(sv.gc) = sapply(names(sv.seqs), function(s) strsplit(s, '\\|')[[1]][1])
+
+
+# Positions
+
+sv.pos.beg = read.table(paste(path.svs, 'svs_all_beg_pos_v03.txt', sep = ''), 
+                        stringsAsFactors = F, check.names = F)
+sv.pos.end = read.table(paste(path.svs, 'svs_all_end_pos_v03.txt', sep = ''), 
+                        stringsAsFactors = F, check.names = F)
+sv.pos.bin = read.table(paste(path.svs, 'svs_se_bin_v03.txt', sep = ''), 
+                        stringsAsFactors = F, check.names = F)
 
 ```
 
@@ -1445,10 +1467,12 @@ sv.graph$edges = sv.graph$edges[sv.graph$edges[,2] %in% nodes.remain, ]
 ```{r}
 g.part <- network(sv.graph$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
 g.part.names = network.vertex.names(g.part)
-set.seed(20)
+
 
 g.part %v% "colors" = as.character(sv.graph$nodes.traits[g.part.names,]$type)
 g.part %v% "node.size" = sv.graph$nodes.traits[g.part.names,]$cnt
+
+set.seed(20)
 p <- ggnet2(g.part, label = F, edge.color = "black",
             node.size =  "node.size",
             # node.size = 1,
@@ -2804,6 +2828,8 @@ dev.off()
 ## No-prot examples
 ```{r}
 
+
+
 cl.np.prot = which(sv.graphcomp$tag == 'no prot')
 cl.np.prot = table(sv.graphcomp$membership[sv.graphcomp$membership %in% cl.np.prot])
 cl.np.prot = as.numeric(names(cl.np.prot)[cl.np.prot > 2])
@@ -2813,13 +2839,15 @@ cl.np.prot
 p.list = list()
 seq.list = c()
 for(i.com in cl.np.prot){
-  names = names(sv.graphcomp$membership[sv.graphcomp$membership == i.com])
-  names.len = as.numeric(sapply(names, function(s) tail(strsplit(s, '\\|')[[1]], 1)))
+  pokaz(i.com)
+  names.com.sv = names(sv.graphcomp$membership[sv.graphcomp$membership == i.com])
+  names.len = as.numeric(sapply(names.com.sv, function(s) tail(strsplit(s, '\\|')[[1]], 1)))
   print(names.len)
   
-  s = sv.seqs[[names[1]]]
+  s = sv.seqs[[names.com.sv[1]]]
   ns = length(s)
   if(!((ns >= 200) & (ns <= 400))) next
+  # stop()
   
   p = dotplot(s, s, 15, 9)
   p.list[[length(p.list) + 1]] = p
@@ -3356,42 +3384,612 @@ for(k in 1:length(tmp.cnt)){
 
 
 
-## Admixture groups
-```{r}
-groups <- c(
-  "germany",
-  "south_sweden",
-  "north_sweden",
-  "south_sweden",
-  "north_sweden",
-  "germany",
-  "western_europe",
-  "central_europe",
-  "italy_balkan_caucasus",
-  "spain",
-  "relict",
-  "asia",
-  "central_europe",
-  "admixed",
-  "spain",
-  "relict",
-  "italy_balkan_caucasus",
-  "western_europe",
-  "asia",
-  "africa",
-  "china",
-  "china",
-  "africa",
-  "africa",
-  "madeira",
-  "madeira",
-  "africa"
-)
+# METHYLATION
 
-# Используем функцию table() для подсчета количества элементов в каждой группе
-as.matrix(table(groups))
+
+## Methylation
+```{r}
+
+path.methylation = paste(path.base, 
+                         '01_data/06_methylation/001.bsseq_on_pacbio/003.pacbiov2.1_Based/', 
+                         sep = '')
+path.meth.only = paste(path.base, 
+                       '01_data/06_methylation/001.bsseq_on_pacbio/003.pacbiov2.1_Based/methylation_only/', 
+                       sep = '')
+
+
+files.meth = list.files(path.methylation, pattern = "\\.tsv$")
+acc.meth = sapply(files.meth, function(s) strsplit(strsplit(s, '_')[[1]][2], '\\.')[[1]][1])
+
+sv.pos.bin.long = sv.pos.bin[sv.se$len >= 100,]
+rownames(sv.se) = sv.se$gr
+
+sv.se.pres = matrix(0, nrow = nrow(sv.pos.bin.long), ncol = length(acc.meth), 
+                    dimnames = list(rownames(sv.pos.bin.long), acc.meth))
+sv.se.meth = matrix(0, nrow = nrow(sv.pos.bin.long), ncol = length(acc.meth), 
+                    dimnames = list(rownames(sv.pos.bin.long), acc.meth))
+
+for(acc in acc.meth){
+  pokaz('Accession', acc)
+  sv.pos.bin.acc = sv.pos.bin.long[, acc, drop = F]
+  sv.pos.bin.acc = sv.pos.bin.acc[sv.pos.bin.acc != 0, ,drop = F]
+  
+  meth.file = names(acc.meth)[acc.meth == acc]
+  file.meth.only = paste(path.meth.only, gsub('.tsv', '.1only.rds', meth.file), sep = '')
+  if(!file.exists(file.meth.only)){
+    
+    pokaz('Create meth-only files')
+    meth.value = read.table(paste(path.methylation, meth.file, sep = ''), stringsAsFactors = F)
+    meth.value = meth.value[meth.value$V7 == 1,]
+    dim(meth.value)  
+    saveRDS(meth.value, file.meth.only)
+  } else {
+    pokaz('Read meth-only files')
+    meth.value = readRDS(file.meth.only)
+  }
+  
+  pos.beg.acc = sv.pos.beg[rownames(sv.pos.bin.acc), acc]
+  pos.end.acc = sv.pos.end[rownames(sv.pos.bin.acc), acc]
+  
+  idx.remain = (pos.beg.acc != 0) & (pos.end.acc != 0)
+  pokaz('Removed zeros', sum(!idx.remain))
+  sv.pos.bin.acc = sv.pos.bin.acc[idx.remain,,drop = F]
+  pos.beg.acc = pos.beg.acc[idx.remain]
+  pos.end.acc = pos.end.acc[idx.remain]
+  
+  sv.se.pres[rownames(sv.pos.bin.acc), acc] = 1
+  
+  
+  meth.value$type = 'CHH'
+  meth.value$type[meth.value$V4 %in% c('CGA', 'CGC', 'CGG', 'CGT')] = 'CG'
+  meth.value$type[meth.value$V4 %in% c('CAG', 'CCG', 'CTG')] = 'CHG'
+  
+  
+  len.max = max(max(pos.beg.acc), max(pos.end.acc), meth.value$V2[nrow(meth.value)])
+  
+  
+  df.meth = data.frame(matrix(0, nrow = length(pos.beg.acc), ncol = 3,
+                       dimnames = list(rownames(sv.pos.bin.acc), c('CG', 'CHG', 'CHH'))))
+  for(meth.type in colnames(df.meth)){
+    
+    pos.meth = rep(0, len.max + 100000)
+    pos.meth[meth.value$V2[meth.value$type == meth.type]] = 1
+    pokaz('Methilation', meth.type, 'amount:', sum(pos.meth))
+    
+    for(irow in (1:nrow(df.meth))){
+      df.meth[irow, meth.type] = sum(pos.meth[pos.beg.acc[irow]:pos.end.acc[irow]])
+    }
+    
+  }
+  
+  # df.meth.relative = rowSums(df.meth) / sv.se[rownames(sv.pos.bin.acc),]$len
+  df.meth.relative = rowSums(df.meth) #/ sv.gc[rownames(sv.pos.bin.acc)]
+  
+  sv.se.meth[rownames(sv.pos.bin.acc), acc] = df.meth.relative
+  
+}
+
+head(sv.se.meth)
+# Divide to GC
+
+dim(sv.se.meth)
+
+for(icol in 1:ncol(sv.se.meth)){
+  tmp = sv.se.meth[,icol] / sv.gc[rownames(sv.se.meth)] 
+  tmp[sv.gc[rownames(sv.se.meth)] == 0] = 0
+  tmp[tmp > 1] = 0  
+  if(sum(is.na(tmp)) > 0) stop('NA methylation found')
+  sv.se.meth[, icol] = tmp
+}
+
+
+sv.se.meth.max = rowMax(sv.se.meth)
+
+sv.se.meth.max.my = sv.se.meth.max
+
+
+# 
 ```
 
+## Alexandra
+```{r}
+
+x = read.table('/Volumes/Samsung_T5/vienn/00_paper/01_data/06_methylation/02_on_sv_v03/CG.methylation_level.12accessions.svs_v03.txt', header = 1, row.names = 1, check.names = F)
+
+x = x[rowSums(!is.na(x)) != 0,]
+x[is.na(x)] = 0
+
+common.names = intersect(rownames(x), rownames(sv.pos.bin))
+x.bin = sv.pos.bin[common.names,colnames(x)]
+x = x[common.names,]
+
+x[is.na(x)] = 0
+
+# y = x * 0
+# y[x.bin == 0] = x[x.bin == 0]
+# y = rowMax(y)
+# y = y[y > 0]
+
+x[x.bin == 0] = NA
+
+
+sv.se.meth.max = rowMeans(x)
+sv.se.meth.max = rowMax(x)
+
+
+plot(rowMeans(x), rowMax(x))
+
+```
+
+### Compare with my
+```{r}
+common.name = intersect(names(sv.se.meth.max.my), names(sv.se.meth.max))
+
+plot(sv.se.meth.max.my[common.name], sv.se.meth.max[common.name])
+
+
+table(sv.se.meth.max.my[common.name] > 0, sv.se.meth.max[common.name] > 0)
+
+
+which((sv.se.meth.max.my[common.name] == 0) & (sv.se.meth.max[common.name] > 0))
+
+
+sv.pos.beg['SVgr_1_id_7213',]
+sv.pos.end['SVgr_1_id_7213',]
+
+d = sv.pos.end['SVgr_1_id_8842', colnames(x)] - sv.pos.beg['SVgr_1_id_8842',colnames(x)]
+d
+
+```
+
+
+
+## On graph
+```{r}
+
+# source(paste(path.pannagram, 'sv/graph_refinement.R', sep = ''))
+
+
+sv.graph$nodes$gr = sapply(sv.graph$nodes$name, function(s) strsplit(s, '\\|')[[1]][1])
+
+# Add methylation in accessions
+names.common = intersect(sv.graph$nodes$gr, names(sv.se.meth.max))
+sv.graph$nodes$meth = NA
+rownames(sv.graph$nodes) = sv.graph$nodes$gr
+sv.graph$nodes[names.common,]$meth = sv.se.meth.max[names.common]
+rownames(sv.graph$nodes) = sv.graph$nodes$name
+
+seqs.trait = setNames(sv.graph$nodes$meth, as.character(sv.graph$nodes$name))
+
+sv.graph$nodes.traits$meth = traitsSeqToNode(sv.graph$nodes, 
+                                                   seqs.trait = seqs.trait,
+                                                   mode = 'max')[sv.graph$nodes.traits$node]
+
+
+```
+
+
+### Meth: Separately visualise connected components
+```{r}
+
+g.part <- network(sv.graph$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.names = network.vertex.names(g.part)
+
+# Get components
+g.comp <- getGraphComponents(sv.graph$edges)
+
+g.comp.cnt = table(g.comp$membership)
+g.comp.cnt = -sort(-g.comp.cnt)
+head(g.comp.cnt)
+
+# ------------------------------------
+# The biggest component
+# ------------------------------------
+k = 1
+comp.id = as.numeric(names(g.comp.cnt)[k])
+
+
+comp.names = names(g.comp$membership)[g.comp$membership == comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
+
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
+
+
+# g.part.sub.big %v% "node.size" = as.numeric(sv.graph$nodes.traits[g.part.sub.big.names,]$cnt)
+g.part.sub.big %v% "colors" = as.character(round(sv.graph$nodes.traits[g.part.names,]$meth * 3) )
+
+# Visualise
+set.seed(20)
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            node.size = 1, 
+            color = "colors",
+            # alpha = 'alpha',
+            mode = 'kamadakawai',
+            palette = c('0' = '#FDAF7B', '1' = '#BE7B72', '2' = '#824D74', '3' = '#401F71')
+            ) + guides(size = F)
+p.big.type = p + theme(legend.position = "none")
+p.big.type
+
+
+# ------------------------------------
+# Small components
+# ------------------------------------
+
+# Construct the graph object
+comp.names = names(g.comp$membership)[g.comp$membership != comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
+
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
+
+
+
+# g.part.sub.big %v% "node.size" = as.numeric(sv.graph$nodes.traits[g.part.sub.big.names,]$cnt)
+g.part.sub.big %v% "colors" = as.character(round(sv.graph$nodes.traits[g.part.names,]$meth * 3) )
+
+# Visualise
+set.seed(20)
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            node.size = 1, 
+            color = "colors",
+            # alpha = 'alpha',
+            # mode = 'kamadakawai',
+            palette = c('0' = '#FDAF7B', '1' = '#BE7B72', '2' = '#824D74', '3' = '#401F71')
+            ) + guides(size = F)
+p.small.type = p + theme(legend.position = "none")
+p.small.type
+
+
+
+
+
+```
+
+## Meth: no-TE SVs
+```{r}
+
+
+
+
+g.part <- network(sv.new$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.names = network.vertex.names(g.part)
+g.part.names = sapply(g.part.names, function(s) strsplit(s, '\\|')[[1]][1])
+# 
+# # Cut the graph
+# tmp.edges = sv.new$edges
+# g.part.names = g.part.names[g.part.names %in% names(sv.se.meth.max)]
+# g.part.names = names(g.part.names)
+# tmp.edges = tmp.edges[(tmp.edges[,1] %in% g.part.names) & (tmp.edges[,2] %in% g.part.names) ,]
+# g.part <- network(tmp.edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+# g.part.names = network.vertex.names(g.part)
+# g.part.names = sapply(g.part.names, function(s) strsplit(s, '\\|')[[1]][1])
+
+
+
+g.part %v% "colors" = as.character(round(sv.se.meth.max[g.part.names] * 2) )
+
+
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "grey30", 
+            node.size = 1,
+            color = "colors",
+            palette = c('0' = '#59D5E0', '1' = '#FAA300', '2' = '#F4538A')
+            # palette = c('0' = '#FDAF7B', '1' = '#BE7B72', '2' = '#824D74', '3' = '#401F71')
+            # mode = "kamadakawai"
+            ) + guides(size = F) + coord_fixed(ratio = 1) 
+p = p+ theme(legend.key.height = unit(0.5, "cm"))
+p
+
+
+```
+
+### Hmmmm I see the difference
+```{r}
+
+
+
+
+for(i.com in cl.np.prot){
+  pokaz(i.com)
+  names.com.sv = names(sv.graphcomp$membership[sv.graphcomp$membership == i.com])
+  names.len = as.numeric(sapply(names.com.sv, function(s) tail(strsplit(s, '\\|')[[1]], 1)))
+  print(names.len)
+  
+  
+  names.com.sv = sapply(names.com.sv, function(s) strsplit(s, '\\|')[[1]][1])
+  
+  print(sv.se.meth.max[names.com.sv])
+  
+}
+
+
+sv.pos.beg['SVgr_1_id_119434',colnames(x)]
+sv.pos.end['SVgr_1_id_119434',colnames(x)]
+
+sv.pos.end['SVgr_1_id_119434',colnames(x)] - sv.pos.beg['SVgr_1_id_119434',colnames(x)]
+
+
+x['SVgr_1_id_119434',]
+
+```
+
+
+
+
+## Meth in categories
+```{r}
+
+sv.se$meth = sv.se.meth.max[sv.se$gr]
+
+sv.se$te = factor(sv.se$te, levels = names(te.cols))
+
+g = ggplot(sv.se[(sv.se$len > 100) & !(is.na(sv.se$meth)),], aes(x = te, y = meth, fill = te)) +
+  geom_violin() +
+  # ylim(0, 25000) +
+    scale_fill_manual(values=te.cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')
+                    ) +
+  xlab('TE content') + ylab('Length, log10') +
+  # scale_y_log10() + 
+  geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
+  theme_minimal() +
+  guides(fill = FALSE) + theme(legend.position = "none") +
+  scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment'))
+
+g
+
+```
+
+
+# EXPRESSION
+```{r}
+
+path.expr = '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/01_data/05_expression/mapping_bed/'
+
+files = list.files(path.expr, pattern = '\\.bedGraph$')
+files
+
+
+expr.cutoff = 2
+
+accessions= unique(sapply(files, function(s) strsplit(s, '\\.')[[1]][2]))
+
+sv.pos.bin.long = sv.pos.bin[sv.se$len >= 100,]
+rownames(sv.se) = sv.se$gr
+
+sv.express = matrix(0, nrow = nrow(sv.pos.bin.long), ncol = length(files), 
+                    dimnames = list(rownames(sv.pos.bin.long), files))
+
+sv.express.max = matrix(0, nrow = nrow(sv.pos.bin.long), ncol = length(files), 
+                    dimnames = list(rownames(sv.pos.bin.long), files))
+
+# gsub('.bedGraph', '',files)
+
+for(f in files[-(1:18)]){
+    
+  acc = sapply(f, function(s) strsplit(s, '\\.')[[1]][2])
+  pokaz('Accession', acc)
+  if(acc == '22001') next
+  
+  expr.values.all = read.table(paste(path.expr, f, sep = ''))
+  
+
+  
+  sv.pos.bin.acc = sv.pos.bin.long[, acc, drop = F]
+  sv.pos.bin.acc = sv.pos.bin.acc[sv.pos.bin.acc != 0, ,drop = F]
+  
+  pos.names = rownames(sv.pos.bin.acc)
+  pos.beg.acc = sv.pos.beg[pos.names, acc]
+  pos.end.acc = sv.pos.end[pos.names, acc]
+  
+  
+  
+  for(i.chr in 1:5){
+    pokaz('Chr', i.chr)
+    expr.values = expr.values.all[expr.values.all$V1 == paste(acc, '_Chr', i.chr, sep = ''),]
+    expr.values$len = expr.values$V3 - expr.values$V2
+    pos.expr = rep(0,max(expr.values$V3))
+    pos.expr[expr.values$V2+1] = expr.values$V4
+    pos.expr[expr.values$V3] = -expr.values$V4
+    pos.expr = cumsum(pos.expr)
+    pos.expr[expr.values$V3] = expr.values$V4
+    
+    if(round(sum(expr.values$len * expr.values$V4)) != round(sum(pos.expr))) stop('Problem with expression mapping')
+    
+    
+    idx.sv.chr <- grep(paste("SVgr_",i.chr,"_", sep = ''), rownames(sv.pos.bin.acc))
+    
+    for(i.sv in idx.sv.chr){
+      sv.express[pos.names[i.sv], f] = mean(pos.expr[pos.beg.acc[i.sv]:pos.end.acc[i.sv]])
+      sv.express.max[pos.names[i.sv], f] = max(pos.expr[pos.beg.acc[i.sv]:pos.end.acc[i.sv]])
+    }
+    
+    
+  }  # i.chr
+  
+  
+  
+}
+
+saveRDS(sv.express, paste(path.expr, 'sv_expression_mean.rds', sep = ''))
+saveRDS(sv.express.max, paste(path.expr, 'sv_expression_max.rds', sep = ''))
+
+plot(rowMax(sv.express), rowMax(sv.express.max))
+
+
+expression = rowMax(sv.express)
+expression = (expression > 1) * 1
+expression[is.na(expression)] = 0
+
+```
+
+# Add expr into datafile
+```{r}
+
+
+# Add methylation in accessions
+names.common = intersect(sv.graph$nodes$gr, names(expression))
+sv.graph$nodes$expr = 0
+rownames(sv.graph$nodes) = sv.graph$nodes$gr
+sv.graph$nodes[names.common,]$expr = expression[names.common]
+rownames(sv.graph$nodes) = sv.graph$nodes$name
+
+seqs.trait = setNames(sv.graph$nodes$expr, as.character(sv.graph$nodes$name))
+
+sv.graph$nodes.traits$expr = traitsSeqToNode(sv.graph$nodes, 
+                                                   seqs.trait = seqs.trait,
+                                                   mode = 'max')[sv.graph$nodes.traits$node]
+
+```
+
+### EXPRE:Separately visualise connected components
+```{r}
+
+# Get components
+g.comp <- getGraphComponents(sv.graph$edges)
+
+g.comp.cnt = table(g.comp$membership)
+g.comp.cnt = -sort(-g.comp.cnt)
+head(g.comp.cnt)
+
+# ------------------------------------
+# The biggest component
+# ------------------------------------
+k = 1
+comp.id = as.numeric(names(g.comp.cnt)[k])
+
+
+comp.names = names(g.comp$membership)[g.comp$membership == comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
+
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
+
+
+g.part.sub.big %v% "colors" = as.character(sv.graph$nodes.traits[g.part.sub.big.names,]$type)
+g.part.sub.big %v% "node.size" = as.numeric(sv.graph$nodes.traits[g.part.sub.big.names,]$expr) + 0.1
+
+g.part.sub.big %v% "alpha" = as.integer(sv.graph$nodes.traits[g.part.sub.big.names,]$meth > 0.3) * 0.8 + 0.2
+
+# g.part.sub.big %v% "colors" = as.character(round(sv.graph$nodes.traits[g.part.sub.big.names,]$meth * 3) )
+
+g.part.sub.big %v% "colors" = as.character(sv.graph$nodes.traits[g.part.sub.big.names,]$expr)
+
+
+# Visualise
+set.seed(20)
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            # node.size = "node.size", 
+            node.size = 1,
+            color = "colors",
+            # alpha = 'alpha',
+            mode = 'kamadakawai',
+            palette = c('0' = '#FDAF7B', '1' = '#401F71')
+            # palette = te.cols
+            ) + guides(size = F)
+p.big.type = p + theme(legend.position = "none")
+p.big.type
+
+
+# ------------------------------------
+# Small components
+# ------------------------------------
+
+# Construct the graph object
+comp.names = names(g.comp$membership)[g.comp$membership != comp.id]
+sv.graph.sub = sv.graph$edges[(sv.graph$edges[,1] %in% comp.names) & 
+                               (sv.graph$edges[,2] %in% comp.names),]
+
+# Construct the graph object
+g.part.sub.big <- network(sv.graph.sub, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+g.part.sub.big.names = network.vertex.names(g.part.sub.big)
+
+
+g.part.sub.big %v% "colors" = as.character(sv.graph$nodes.traits[g.part.sub.big.names,]$type)
+g.part.sub.big %v% "node.size" = as.numeric(sv.graph$nodes.traits[g.part.sub.big.names,]$expr) + 0.1
+
+# g.part.sub.big %v% "alpha" = as.integer(sv.graph$nodes.traits[g.part.names,]$meth > 0.3) * 0.8 + 0.2
+
+g.part.sub.big %v% "colors" = as.character(round(sv.graph$nodes.traits[g.part.sub.big.names,]$meth * 3) )
+g.part.sub.big %v% "colors" = as.character(sv.graph$nodes.traits[g.part.sub.big.names,]$expr)
+
+# Visualise
+set.seed(20)
+p <- ggnet2(g.part.sub.big, label = F, edge.color = "black", 
+            # node.size = "node.size", 
+            node.size = 1,
+            color = "colors",
+            # alpha = 'alpha',
+            # mode = 'kamadakawai',
+            palette = c('0' = '#FDAF7B', '1' = '#401F71')
+            # palette = te.cols
+            ) + guides(size = F)
+p.small.type = p + theme(legend.position = "none")
+p.small.type
+
+
+table(sv.graph$nodes$expr, sv.graph$nodes$type)
+
+
+```
+
+## Expr: no-TE SVs
+```{r}
+
+g.part %v% "colors" = sv.memb[g.part.names, 'prot']
+g.part.names.cut = sapply(g.part.names, function(s) strsplit(s, '\\|')[[1]][1])
+
+
+g.part %v% "colors" = as.character(expression[g.part.names.cut])
+
+
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "black", 
+            node.size = 1,
+            color = "colors",
+            palette = c('0' = '#FDAF7B', '1' = '#401F71')
+            # mode = "kamadakawai"
+            ) + guides(size = F) + coord_fixed(ratio = 1) 
+p = p+ theme(legend.key.height = unit(0.5, "cm"))
+p
+
+
+
+
+```
+### Expression and BLAST
+```{r}
+
+sv.memb$prot
+sv.memb$name
+sv.memb$gr = sapply(sv.memb$name, function(s) strsplit(s, '\\|')[[1]][1])
+sv.memb$expr = expression[sv.memb$gr]
+# sv.memb$expr[is.na(sv.memb$expr)] = 0
+
+
+
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+cnt = as.data.frame(table(sv.memb$prot, sv.memb$expr))
+
+ggplot(cnt, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity", position = "fill") +  # Использование position = "fill"
+  labs(x = "Row Name", y = "Proportion", fill = "Column Name") +  # Изменение метки оси Y
+  theme_minimal()
+
+```
 
 
 # OLD
