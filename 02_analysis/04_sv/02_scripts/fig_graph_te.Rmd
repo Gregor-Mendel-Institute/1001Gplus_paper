@@ -14,11 +14,13 @@ path.base = '../../../'
 path.pannagram = paste(path.base, '../pannagram/', sep = '')
 
 source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
-source(paste(path.pannagram, 'sv/graph_refinement.R', sep = ''))
+source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
 source(paste(path.pannagram, 'utils/utils.R', sep = ''))
 source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
 source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
 source(paste(path.pannagram, 'visualisation/orfplot.R', sep = ''))
+
+source(paste(path.pannagram, 'visualisation/visualisation.R', sep = ''))
 ```
 
 
@@ -1037,6 +1039,7 @@ bl.res = bl.res[bl.res$V1 != bl.res$V8,]
 ```
 
 
+
 ## TE stat
 
 ### In graph - not in graph
@@ -1045,6 +1048,7 @@ res.nest = res.nest0
 
 sv.se.len = sv.se[sv.se$len >= 100,]
 sv.se.len$in.connect = sv.se.len$name %in% names(res.nest.len)
+
 
 cnt.sv.se = table(sv.se.len$in.connect , sv.se.len$te)
 cnt.sv.se
@@ -1084,19 +1088,33 @@ p = ggplot(df, aes(x = Var2, y = value, fill = Var2, alpha = Var1, color = Var1)
     legend.position = c(0.7, 0.3),     # Adjust these coordinates as needed
     legend.background = element_rect(fill="transparent", color='grey70')  
   ) +
-  theme(axis.text.y = element_blank()) +
+  # scale_y_continuous(breaks = levels(df$Var2),
+  #                    labels = c('a', 'b', 'c', 'd', 'e')) +
+  # theme(axis.text.y = c('a', 'b', 'c', 'd', 'e')) +
   guides(pattern = guide_legend(override.aes = list(fill = c("white"), color= 'black')))  
 p
 
-pdf(paste(path.figures, 'graph_mob_in_graph.pdf', sep = ''), width = 3, height = 4)
+pdf(paste(path.figures, 'graph_mob_in_graph.pdf', sep = ''), width = 5, height = 4)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
 
 ```
+### Save "in graph data"
+```{r}
+
+df.bin = sv.pos.bin[rownames(sv.se.len)[sv.se.len$in.connect],]
+rownames(df.bin) = sv.se.len[rownames(df.bin),]$name
+
+sv.names.in.graph = rownames(df.bin)
+
+saveRDS(df.bin, paste(path.work,'sv_bin_ingraph.rds', sep = ''))
+```
+
+
+
 ### Stat for the paper
 ```{r}
 df.te = df[df$Var2 != 'noTE',]
-
 
 
 if(sum(df.te[!df.te$Var1,]$Var2 != df.te[df.te$Var1,]$Var2) == 0){
@@ -1152,9 +1170,9 @@ pp = ggpubr::ggarrange(p + xlab('TE content') + scale_x_discrete(labels = c('is 
                                'cont. compl.', 'cont. fragm.')) , g, ncol = 2, widths = c(0.75, 0.25))
 pp
 
-pdf(paste(path.figures, 'graph_mob_te_fam_sv_type.pdf', sep = ''), width = 6, height = 4)
-print(pp)     # Plot 1 --> in the first page of PDF
-dev.off()
+# pdf(paste(path.figures, 'graph_mob_te_fam_sv_type.pdf', sep = ''), width = 6, height = 4)
+# print(pp)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
 
 # Insertion and deletion
@@ -1164,6 +1182,9 @@ table(sv.se.len$fam[idx], sv.se.len$te[idx])
 idx = (sv.se.len$fam!='') & (sv.se.len$freq.max >= 25) & (sv.se.len$len >= 100) 
 table(sv.se.len$fam[idx], sv.se.len$te[idx])
 ```
+
+
+
 ### TE fam: TAIR10
 ```{r}
 f.te.ref = paste(path.tair, 'new_te.fasta', sep = '')
@@ -1219,13 +1240,96 @@ p = p + annotate("text", x = min(df$ref), y = max(df$value),
            label = paste('Slope:', round(slope, 3)), hjust = 0, vjust = 1)
 
 
-
-pdf(paste(path.figures, 'graph_mob_te_fam_tair10.pdf', sep = ''), width = 4, height = 4)
-print(p)     # Plot 1 --> in the first page of PDF
-dev.off()
+# 
+# pdf(paste(path.figures, 'graph_mob_te_fam_tair10.pdf', sep = ''), width = 4, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
 
 ```
+
+
+## Bridges
+```{r}
+
+head(sv.se.len)
+rownames(sv.se.len) = sv.se.len$name
+
+head(bl.res)
+
+df.nest = res.nest
+
+df.nest$f1 = sv.se.len[df.nest$V1,]$fam
+df.nest$f8 = sv.se.len[df.nest$V8,]$fam
+
+df.nest$f1[is.na(df.nest$f1)] = ''
+df.nest$f8[is.na(df.nest$f8)] = ''
+
+df.nest = df.nest[df.nest$f1 != df.nest$f8,]
+
+df.nest = df.nest[df.nest$f1 != 'Helitron',]
+df.nest = df.nest[df.nest$f8 != 'Helitron',]
+
+df.nest = df.nest[df.nest$f1 != 'TEG',]
+df.nest = df.nest[df.nest$f8 != 'TEG',]
+
+df.nest = df.nest[(df.nest$p1 > 0.8) | (df.nest$p8 > 0.8),]
+df.nest = df.nest[(df.nest$len1 > 100) & (df.nest$len8 > 100),]
+
+df.nest = df.nest[(df.nest$p1 > 0.8) | (df.nest$p8 > 0.8),]
+df.nest = df.nest[(df.nest$len1 > 1000) | (df.nest$len8 > 1000),]
+
+sv.no.te = unique(c(df.nest$V1[df.nest$f1 == ''], df.nest$V8[df.nest$f8 == '']))
+sv.name = sv.no.te[1]
+
+sv.name.found = c()
+for(sv.name in sv.no.te){
+  df.tmp = df.nest[(df.nest$V1 == sv.name) | (df.nest$V8 == sv.name),]
+  if (length(unique(c(df.tmp$f1, df.tmp$f8))) > 2) sv.name.found = c(sv.name.found, sv.name)
+  
+}
+
+k = 15
+sv.name = sv.name.found[k]
+df.tmp = df.nest[(df.nest$V1 == sv.name) | (df.nest$V8 == sv.name),]
+head(df.tmp)
+
+
+```
+
+
+
+```{r}
+name1 = 'SVgr_1_id_75710|141'
+name2 = 'SVgr_2_id_90768|5720'
+dotplot.s(sv.seqs[name1], sv.seqs[name2], 15, 12)
+
+name3 = 'SVgr_1_id_76841|15640'
+dotplot.s(sv.seqs[name1], sv.seqs[name3], 15, 12)
+
+dotplot.s(sv.seqs[name3], sv.seqs[name2], 15, 12)
+
+
+name4 = 'SVgr_3_id_77360|16138'
+dotplot.s(sv.seqs[name3], sv.seqs[name4], 15, 12)
+
+
+```
+
+
+```{r}
+name1 = 'SVgr_1_id_115061|1207'
+name2 = 'SVgr_1_id_126768|3181'
+dotplot.s(sv.seqs[name1], sv.seqs[name2], 15, 12)
+
+name3 = 'SVgr_1_id_71204|9005'
+dotplot.s(sv.seqs[name1], sv.seqs[name3], 15, 12)
+
+dotplot.s(sv.seqs[name3], sv.seqs[name2], 15, 12)
+
+
+```
+
 
 
 ## Graph creation
@@ -2289,7 +2393,6 @@ big.families$subfam = x[big.families$node]
 ```{r}
 
 
-
 # sv.se = readRDS(paste(path.svs, 'sv_se.rds', sep = ''))
 
 sv.se.no.te = sv.se$name[(sv.se$te == 'noTE') & (sv.se$len > 50)]
@@ -2529,6 +2632,18 @@ cbind(tmp,sv.graphcomp$csize[tmp])
 
 
 g.part %v% "org" = sv.graphcomp$membership[g.part.names] %in% 5
+set.seed(239)
+p <- ggnet2(g.part, label = F, edge.color = "black", 
+            node.size = 1,
+            color = "org",
+            palette = 'Set1',
+            # mode = "kamadakawai"
+            ) 
+p
+
+
+
+g.part %v% "org" = sv.graphcomp$membership[g.part.names] == 'SVgr_3_id_79231|5005'
 set.seed(239)
 p <- ggnet2(g.part, label = F, edge.color = "black", 
             node.size = 1,
@@ -3493,31 +3608,78 @@ sv.se.meth.max.my = sv.se.meth.max
 
 ## Alexandra
 ```{r}
+meth.types = c('CHH', 'CHG', 'CG')
 
-x = read.table('/Volumes/Samsung_T5/vienn/00_paper/01_data/06_methylation/02_on_sv_v03/CG.methylation_level.12accessions.svs_v03.txt', header = 1, row.names = 1, check.names = F)
+sv.se.meth.max.all = list()
+sv.se.meth.mean.all = list()
 
-x = x[rowSums(!is.na(x)) != 0,]
-x[is.na(x)] = 0
+for(meth.type in meth.types){
+  x = read.table(paste('/Volumes/Samsung_T5/vienn/00_paper/01_data/06_methylation/02_on_sv_v03/',
+                       meth.type,
+                       '.methylation_level.12accessions.svs_v03.txt', sep = ''), 
+                 header = 1, row.names = 1, check.names = F)
+  
+  x = x[rowSums(!is.na(x)) != 0,]
+  x[is.na(x)] = 0
+  
+  common.names = intersect(rownames(x), rownames(sv.pos.bin))
+  x.bin = sv.pos.bin[common.names,colnames(x)]
+  x = x[common.names,]
+  
+  x[is.na(x)] = 0
+  
+  x[x.bin == 0] = NA
+  
+  sv.se.meth.max.all[[meth.type]] = rowMax(x)  
+  sv.se.meth.mean.all[[meth.type]] = rowMeans(x, na.rm = T)  
+  
+}
 
-common.names = intersect(rownames(x), rownames(sv.pos.bin))
-x.bin = sv.pos.bin[common.names,colnames(x)]
-x = x[common.names,]
 
-x[is.na(x)] = 0
-
-# y = x * 0
-# y[x.bin == 0] = x[x.bin == 0]
-# y = rowMax(y)
-# y = y[y > 0]
-
-x[x.bin == 0] = NA
+# Read Chip-seq
 
 
-sv.se.meth.max = rowMeans(x)
-sv.se.meth.max = rowMax(x)
 
+x = read.table(paste('/Volumes/Samsung_T5/vienn/00_paper/01_data/06_methylation/02_on_sv_v03/',
+                       'ChIPseq_coverage.input_and_quantile_normalized.6accessions.svs_v03.txt', sep = ''), 
+                 header = 1, check.names = F)
+rownames(x) = x$gene
+x = x[,-ncol(x)]
 
-plot(rowMeans(x), rowMax(x))
+x.chip.type = sapply(colnames(x), function(s) strsplit(s, '\\.')[[1]][1] )
+x.acc = sapply(colnames(x), function(s) strsplit(s, '\\.')[[1]][2] )
+chip.type = unique(x.chip.type)
+for(c.type in chip.type){
+  pokaz(c.type)
+  idx.type = x.chip.type == c.type
+  y = x[,idx.type]
+  colnames(y) = x.acc[idx.type]
+  
+  y = y[rowSums(!is.na(y)) != 0,]
+  y[is.na(y)] = 0
+  
+  common.names = intersect(rownames(y), rownames(sv.pos.bin))
+  y.bin = sv.pos.bin[common.names,colnames(y)]
+  y = y[common.names,]
+  
+  y[is.na(y)] = 0
+  
+  y[y.bin == 0] = NA
+  
+  sv.se.meth.max.all[[c.type]] = rowMax(y)  
+  sv.se.meth.mean.all[[c.type]] = rowMeans(y, na.rm = T)    
+  
+  y.names = paste(c.type, '_acc_', colnames(y), sep = '')
+  for(i.col in 1:ncol(y)){
+    pokaz(y.names[i.col])
+    tmp = y[,i.col]
+    names(tmp) = rownames(y)
+    sv.se.meth.max.all[[y.names[i.col]]] = tmp
+    sv.se.meth.mean.all[[y.names[i.col]]] = tmp
+  }
+
+}
+
 
 ```
 
@@ -3539,6 +3701,294 @@ sv.pos.end['SVgr_1_id_7213',]
 
 d = sv.pos.end['SVgr_1_id_8842', colnames(x)] - sv.pos.beg['SVgr_1_id_8842',colnames(x)]
 d
+
+```
+
+
+
+
+## Meth: violineplot
+```{r}
+
+min.len = 1000
+# for(meth.type in names(sv.se.meth.mean.all)){
+for(meth.type in names(sv.se.meth.mean.all)[1:3]){
+  
+  # for(s.stat in c('mean', 'max')){
+  for(s.stat in c('max')){
+    
+    pokaz(meth.type, s.stat)
+      
+    if(s.stat == 'mean'){
+      meth.tmp = sv.se.meth.mean.all[[meth.type]]
+    } else {
+      meth.tmp = sv.se.meth.max.all[[meth.type]]
+    }
+      
+    path.figures.meth = paste(path.figures, 'meth_express/', sep = '')
+    sv.se$meth = meth.tmp[sv.se$gr]
+    
+    sv.se$te = factor(sv.se$te, levels = names(te.cols))
+    
+    g = ggplot(sv.se[(sv.se$len > min.len) & !(is.na(sv.se$meth)),], aes(x = te, y = meth, fill = te)) +
+      geom_violin(draw_quantiles = c(0.5), scale = "width", width = 0.6) +
+      # ylim(0, 25000) +
+        scale_fill_manual(values=te.cols, name ='TE content', 
+                        labels = c('none', 'is complete', 'is fragment', 
+                                   'contains complete', 'contains fragment')
+                        ) +
+      xlab(NULL) + 
+      # xlab('TE content') + 
+      ylab(paste(meth.type, 'methylation', sep = ' ')) +
+      # scale_y_log10() + 
+      geom_jitter(width = 0.2, size = 1, alpha = 0.07, stroke = 0) +
+      theme_minimal() +
+      guides(fill = FALSE) + theme(legend.position = "none") +
+      scale_x_discrete(labels = c('none', 'is complete',
+                                   'contains complete', 'contains fragment', 'is fragment')) +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+    
+    g
+    
+    
+    pdf(paste(path.figures.meth, 'meth_',meth.type, '_in_te_type_',s.stat,'_',min.len,'.pdf', sep = ''), 
+        width = 5, height = 3.5)
+    print(g )     # Plot 1 --> in the first page of PDF
+    dev.off()
+  
+  }
+  
+}
+
+
+```
+
+```{r}
+x <- rnorm(100) 
+
+bins_fixed <- cut(x, breaks = c(-Inf, -1, 0, 1, Inf))
+bins_fixed
+```
+
+
+
+
+### + frequency
+```{r}
+freq.bins = c(-Inf,1, 3, 24, Inf)
+sv.se$freq.gr = cut(sv.se$freq.max, freq.bins,
+                    labels = c('privat', 'low', 'mid', 'high'))
+
+min.len = 1000
+# for(meth.type in names(sv.se.meth.mean.all)){
+for(meth.type in names(sv.se.meth.mean.all)[1:3]){
+  
+  # for(s.stat in c('mean', 'max')){
+  for(s.stat in c('max')){
+    
+    pokaz(meth.type, s.stat)
+      
+    if(s.stat == 'mean'){
+      meth.tmp = sv.se.meth.mean.all[[meth.type]]
+    } else {
+      meth.tmp = sv.se.meth.max.all[[meth.type]]
+    }
+      
+    path.figures.meth = paste(path.figures, 'meth_express/', sep = '')
+    sv.se$meth = meth.tmp[sv.se$gr]
+    
+    sv.se$te = factor(sv.se$te, levels = names(te.cols))
+    
+    # g = ggplot(sv.se[(sv.se$len > min.len) & !(is.na(sv.se$meth)),], 
+    #            aes(x = interaction(freq.gr, te, sep = " - "), y = meth, fill = te)) +
+    #   geom_boxplot(draw_quantiles = c(0.5), outliers = FALSE) +
+    #   # geom_violin(draw_quantiles = c(0.5), scale = "width", width = 0.6) +
+    #   # ylim(0, 25000) +
+    #     scale_fill_manual(values=te.cols, name ='TE content', 
+    #                     labels = c('none', 'is complete', 'is fragment', 
+    #                                'contains complete', 'contains fragment')
+    #                     ) +
+    #   xlab('TE content') + ylab(paste(meth.type, 'methylation', sep = ' ')) +
+    #   # scale_y_log10() + 
+    #   geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
+    #   theme_minimal() +
+    #   guides(fill = FALSE) + theme(legend.position = "none") +
+    #   # scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+    #   #                              'contains complete', 'contains fragment')) +
+    #   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+    # 
+    # g
+    
+    
+      g = ggplot(sv.se[(sv.se$len > min.len) & !(is.na(sv.se$meth)),], 
+               aes(x = freq.gr, y = meth, fill = te)) +
+      geom_boxplot(draw_quantiles = c(0.5), outliers = FALSE) +
+      # geom_violin(draw_quantiles = c(0.5), scale = "width", width = 0.6) +
+      # ylim(0, 25000) +
+        scale_fill_manual(values=te.cols, name ='TE content', 
+                        labels = c('none', 'is complete', 'is fragment', 
+                                   'contains complete', 'contains fragment')
+                        ) +
+      xlab('Frequency') + ylab(paste(meth.type, 'methylation', sep = ' ')) +
+      # scale_y_log10() + 
+      geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
+      theme_minimal() +
+      guides(fill = FALSE) + theme(legend.position = "none") +
+      # scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+      #                              'contains complete', 'contains fragment')) +
+        facet_grid(cols = vars(te),
+                   labeller = as_labeller(c('noTE' = 'none', 
+                                            'isTE' = 'is complete', 
+                                            'isTEpart' = 'is fragment', 
+                                            'hasTE' = 'contains compl.', 
+                                            'hasTEpart' = 'contains frag.'))) +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+        theme(strip.text.x = element_blank())
+    
+    g
+    
+    
+    
+    pdf(paste(path.figures.meth, 'meth_',meth.type, '_in_te_type_',s.stat,'_',min.len,'_freq.pdf', sep = ''), 
+        width = 5, height = 3.5)
+    print(g )     # Plot 1 --> in the first page of PDF
+    dev.off()
+  
+  }
+  
+}
+
+```
+
+
+
+### + in graph
+```{r}
+
+
+min.len = 1000
+# for(meth.type in names(sv.se.meth.mean.all)){
+for(meth.type in names(sv.se.meth.mean.all)[1:3]){
+  
+  # for(s.stat in c('mean', 'max')){
+  for(s.stat in c('max')){
+    
+    pokaz(meth.type, s.stat)
+      
+    if(s.stat == 'mean'){
+      meth.tmp = sv.se.meth.mean.all[[meth.type]]
+    } else {
+      meth.tmp = sv.se.meth.max.all[[meth.type]]
+    }
+      
+    path.figures.meth = paste(path.figures, 'meth_express/', sep = '')
+    sv.se.len$meth = meth.tmp[sv.se.len$gr]
+    
+    sv.se.len$te = factor(sv.se.len$te, levels = names(te.cols))
+    
+    g = ggplot(sv.se.len[(sv.se.len$len > min.len) & !(is.na(sv.se.len$meth)),], 
+               aes(x = in.connect, y = meth, fill = te)) +
+      geom_boxplot(draw_quantiles = c(0.5), outliers = FALSE) +
+      # geom_violin(draw_quantiles = c(0.5), scale = "width", width = 0.6) +
+      # ylim(0, 25000) +
+        scale_fill_manual(values=te.cols, name ='TE content', 
+                        labels = c('none', 'is complete', 'is fragment', 
+                                   'contains complete', 'contains fragment')
+                        ) +
+      xlab('In Graph') + ylab(paste(meth.type, 'methylation', sep = ' ')) +
+      # scale_y_log10() + 
+      geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
+      theme_minimal() +
+      guides(fill = FALSE) + theme(legend.position = "none") +
+      scale_x_discrete(labels = c('No', 'Yes')) +
+      facet_grid(cols = vars(te),
+                   labeller = as_labeller(c('noTE' = 'none', 
+                                            'isTE' = 'is complete', 
+                                            'isTEpart' = 'is fragment', 
+                                            'hasTE' = 'contains compl.', 
+                                            'hasTEpart' = 'contains frag.'))) +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+        theme(strip.text.x = element_blank()) + 
+      stat_compare_means(aes(group = in.connect), label = "p.signif", method = "wilcox.test")
+    
+    g
+    
+    
+    pdf(paste(path.figures.meth, 'meth_',meth.type, '_in_te_type_',s.stat,'_',min.len,'_in_graph.pdf', sep = ''), 
+        width = 5, height = 3.5)
+    print(g )     # Plot 1 --> in the first page of PDF
+    dev.off()
+  
+  }
+  
+}
+```
+
+
+
+```{r}
+
+min.len = 1000
+for(meth.type in names(sv.se.meth.mean.all)){
+  
+  # for(s.stat in c('mean', 'max')){
+  for(s.stat in c('max')){
+    
+    pokaz(meth.type, s.stat)
+      
+    if(s.stat == 'mean'){
+      meth.tmp = sv.se.meth.mean.all[[meth.type]]
+    } else {
+      meth.tmp = sv.se.meth.max.all[[meth.type]]
+    }
+      
+    path.figures.meth = paste(path.figures, 'meth_express/', sep = '')
+    sv.se.len$meth = meth.tmp[sv.se.len$gr]
+    
+    sv.se.len$te = factor(sv.se.len$te, levels = names(te.cols))
+    
+    g = ggplot(sv.se.len[(sv.se.len$len > min.len) & !(is.na(sv.se.len$meth)),], 
+               aes(x = interaction(freq.gr, in.connect, te, sep = " - "), y = meth, fill = te, alpha = in.connect)) +
+      geom_boxplot(draw_quantiles = c(0.5), outliers = FALSE) +
+      # ylim(0, 25000) +
+        scale_fill_manual(values=te.cols, name ='TE content', 
+                        labels = c('none', 'is complete', 'is fragment', 
+                                   'contains complete', 'contains fragment')
+                        ) +
+      xlab('TE content') + ylab(paste(meth.type, 'methylation', sep = ' ')) +
+      # scale_y_log10() + 
+      geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
+      theme_minimal() +
+      guides(fill = FALSE) + theme(legend.position = "none") +
+      # scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+      #                              'contains complete', 'contains fragment')) +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+    
+    g
+    
+    
+    pdf(paste(path.figures.meth, 'meth_',meth.type, '_in_te_type_',s.stat,'_',min.len,'_super.pdf', sep = ''), 
+        width = 5, height = 4)
+    print(g )     # Plot 1 --> in the first page of PDF
+    dev.off()
+  
+  }
+  
+}
+```
+
+
+# Frequency plots for every category
+```{r}
+
+
+tmp = sv.se[sv.se$te == 'isTEpart',]
+
+unique(sv.se$te )
+tmp = tmp[tmp$len >= 100,]
+
+plot(tmp$meth, tmp$freq)
+
 
 ```
 
@@ -3719,36 +4169,292 @@ x['SVgr_1_id_119434',]
 ```
 
 
-
-
-## Meth in categories
+# EXPRESSION
 ```{r}
 
-sv.se$meth = sv.se.meth.max[sv.se$gr]
 
-sv.se$te = factor(sv.se$te, levels = names(te.cols))
+sv.se.exp.max.all = list()
+sv.se.exp.mean.all = list()
 
-g = ggplot(sv.se[(sv.se$len > 100) & !(is.na(sv.se$meth)),], aes(x = te, y = meth, fill = te)) +
-  geom_violin() +
-  # ylim(0, 25000) +
-    scale_fill_manual(values=te.cols, name ='TE content', 
-                    labels = c('none', 'is complete', 'is fragment', 
-                               'contains complete', 'contains fragment')
-                    ) +
-  xlab('TE content') + ylab('Length, log10') +
-  # scale_y_log10() + 
-  geom_jitter(width = 0.2, size = 1, alpha = 0.1, stroke = 0) +
-  theme_minimal() +
-  guides(fill = FALSE) + theme(legend.position = "none") +
-  scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
-                               'contains complete', 'contains fragment'))
 
-g
+x = read.table('/Volumes/Samsung_T5/vienn/00_paper/01_data/05_expression/02_on_sv_v03/counts.SVs.bed',
+               row.names = 1, header = 1, check.names = F)
+
+idx.x.tissues <- grep("^[SRFP]\\.", colnames(x), ignore.case = F)
+pokaz('Removed:', colnames(x)[-idx.x.tissues])
+x = x[,idx.x.tissues]
+
+x.acc.name = sapply(colnames(x), function(s) strsplit(s, '\\.')[[1]][2])
+x.tissue = sapply(colnames(x), function(s) strsplit(s, '\\.')[[1]][1])
+acc.unique = unique(x.acc.name)
+
+df.expr = list()
+for(acc in acc.unique){
+  pokaz('Accession', acc)
+  idx.acc = x.acc.name == acc
+  y = x[,idx.acc]
+  colnames(y) = x.tissue[idx.acc]
+  
+  
+  y = y[rowSums(!is.na(y)) != 0,]
+  y[is.na(y)] = 0
+  
+  common.names = intersect(rownames(y), rownames(sv.pos.bin))
+  y.bin = sv.pos.bin[common.names,acc]
+  y = y[common.names,]
+  
+  y[is.na(y),] = 0
+  
+  y = y[y.bin != 0,]
+  
+  y = as.data.frame(y)
+  y$names = rownames(y)
+  
+  y.long = reshape2::melt(y, id.vars = 'names')
+  
+  df.expr[[acc]] = y.long
+
+}
+
+
+```
+
+## Noramlise by length
+```{r}
+tmp = df.expr
+rownames(sv.se) = sv.se$gr
+for(i in 1:length(df.expr)){
+  df.expr[[i]]$value = df.expr[[i]]$value / sv.se[df.expr[[i]]$names,]$len
+}
+
 
 ```
 
 
-# EXPRESSION
+
+## Expr: violineplot
+```{r}
+
+sv.target = sv.se$gr[sv.se$freq.max >= 25]
+
+path.figures.meth = paste(path.figures, 'expression_norm_high/', sep = '')
+
+if (!dir.exists(path.figures.meth)) {
+  dir.create(path.figures.meth, recursive = TRUE)
+} 
+
+min.len = 100
+for(acc in names(df.expr)){
+  pokaz('Accession', acc)
+  
+  # for(s.stat in c('mean', 'max')){
+  df = df.expr[[acc]]
+  
+  # # target
+  # df = df[df$names %in% sv.target,]
+  
+  df$te = sv.se[as.character(df$names),]$te
+  df$len = sv.se[df$names,]$len
+    
+  df$te = factor(df$te, levels = names(te.cols))
+  df = df[df$len > min.len,]
+    
+  g = ggplot(df, 
+             aes(x = interaction(variable, te, sep = " - "), 
+                 y = value, 
+                  # color = te,
+                 fill = te)) +
+    geom_violin(draw_quantiles = c(0.5)) +
+    # ylim(0, 25000) +
+      scale_fill_manual(values=te.cols, name ='TE content', 
+                      labels = c('none', 'is complete', 'is fragment', 
+                                 'contains complete', 'contains fragment')
+                      ) +
+    xlab('TE content') + ylab(NULL) +
+    scale_y_log10() +
+    geom_jitter(width = 0.2, size = 1, alpha = 0.5, stroke = 0) +
+    theme_minimal() +
+    guides(fill = FALSE) + theme(legend.position = "none") +
+    # scale_x_discrete(labels = c('none', 
+    #                             'is complete',
+    #                             'contains complete',
+    #                             'contains fragment', 
+    #                             'is fragment')) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  
+  g
+    
+    
+  pdf(paste(path.figures.meth, 'expr_acc_',acc, '_',min.len,'.pdf', sep = ''), 
+      width = 5, height = 4)
+  print(g )     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+
+  
+}
+
+
+```
+
+## Expr: common plot
+```{r}
+sv.target = sv.se$gr[sv.se$freq.max >= 25]
+
+path.figures.heatmap = paste(path.figures, 'expression_norm_heatmap/', sep = '')
+
+if (!dir.exists(path.figures.heatmap)) {
+  dir.create(path.figures.heatmap, recursive = TRUE)
+} 
+
+mode.in.graph = T
+
+min.len = 1000
+result.all = c()
+for(acc in names(df.expr)){
+  pokaz('Accession', acc)
+  
+  # for(s.stat in c('mean', 'max')){
+  df = df.expr[[acc]]
+  
+  
+  
+  # target
+  # df = df[df$names %in% sv.target,]
+  if(mode.in.graph){
+    df = df[df$names %in% sv.names.in.graph,]  
+    s.suffix = '_in_graph'
+  } else {
+    s.suffix = ''
+  }
+  
+  
+  df$te = sv.se[as.character(df$names),]$te
+  df$len = sv.se[df$names,]$len
+    
+  df$te = factor(df$te, levels = names(te.cols))
+  df = df[df$len > min.len,]
+    
+  
+  result <- df %>%
+  group_by(te, variable) %>%
+  summarise(mean_value = mean(value), .groups = 'drop')
+  
+  result$comb = paste(result$te, result$variable, sep = '_')
+  result$acc = acc
+   
+  result.all = rbind(result.all, result) 
+
+}
+
+
+
+
+
+```
+
+
+### accessions order
+```{r}
+admix=list(germany=c("1741","6909"),
+            south_sweden=c("6024","6124"),
+            north_sweden=c("6069","6244"),
+            western_europe=c("6966","10002"),
+            central_europe=c("8236","9728"),
+            italy_balkan_caucasus=c("9075","9981"),
+            spain=c("9537","9888"),
+            relict=c("9543","9905"),
+            asia=c("9638","10015"),
+            admixed=c("9764"),
+            africa=c("10024","22003","22004","22007"),
+            china=c("22001","22002","220011"),
+            madeira=c("22005","22006"))
+
+
+acc.admix <- c()
+
+# Перебираем исходный список и меняем местами имена и значения
+for (region in names(admix)) {
+  ids <- admix[[region]]
+  for (id in ids) {
+    acc.admix[id] <- region
+  }
+}
+
+acc.admix = sort(acc.admix)
+
+
+```
+
+
+
+### Heatmap
+
+```{r}
+result.all <- result.all %>%
+  group_by(acc) %>%
+  mutate(normalized_value = scales::rescale(mean_value, to = c(0, 1))) %>%
+  ungroup()
+
+result.all$acc = factor(result.all$acc, levels = names(acc.admix))
+
+p = ggplot(result.all, aes(x = variable, y = acc, fill = log(normalized_value,base = 10))) +
+  geom_tile() +
+  facet_grid(cols = vars(te),
+             labeller = as_labeller(c('noTE' = 'no TE', 
+                                            'isTE' = 'is compl. TE', 
+                                            'isTEpart' = 'is TE fragm.', 
+                                            'hasTE' = 'contains compl. TE', 
+                                            'hasTEpart' = 'contains TE fragm.'))) + 
+  # scale_fill_gradient(low = "blue", high = "red") +
+  # scale_fill_viridis(option = "C") +
+  scale_fill_gradientn(colors = c("#A2CDCD", "#CEE5D0", "#FFE1AF", "#D57E7E"), na.value = '#A2CDCD') +
+  labs(title = "Mean Expression Values: normalized to [0,1] and log10-transformed", 
+       x = "Tissue", y = "Accessions", fill = 'log10') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1),
+        axis.text.y = element_text(size = 6),
+        legend.position = "bottom")
+p
+
+
+
+pdf(paste(path.figures.heatmap, 'expr_heatmap_',min.len,s.suffix,'.pdf', sep = ''),
+    width = 7, height = 3.5)
+print(p )     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+```{r}
+p = ggplot(result.all, aes(x = variable, y = normalized_value,
+                           color = log(normalized_value, base = 10))) +
+  geom_jitter(width = 0.2) +
+  geom_boxplot(aes(group = variable), fill = NA, outliers = F) +
+  facet_grid(cols = vars(te),
+             labeller = as_labeller(c('noTE' = 'no TE', 
+                                      'isTE' = 'is compl. TE', 
+                                      'isTEpart' = 'is TE fragm.', 
+                                      'hasTE' = 'contains compl. TE', 
+                                      'hasTEpart' = 'contains TE fragm.'))) + 
+  scale_color_gradientn(colors = c("#A2CDCD", "#CEE5D0", "#FFE1AF", "#D57E7E"), na.value = '#A2CDCD') +
+  labs(title = "Mean Expression Values: normalized to [0,1] per accession", 
+       x = "Tissue", y = "Normalized Value", color = 'log10') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1),
+        legend.position = "bottom")
+p
+
+pdf(paste(path.figures.heatmap, 'expr_boxplot_',min.len,s.suffix,'.pdf', sep = ''),
+    width = 7, height = 3)
+print(p )     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+
+# EXPRESSION - old
 ```{r}
 
 path.expr = '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/01_data/05_expression/mapping_bed/'

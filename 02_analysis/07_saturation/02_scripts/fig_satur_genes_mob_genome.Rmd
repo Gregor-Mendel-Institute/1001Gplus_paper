@@ -1,0 +1,675 @@
+---
+title: "Figures for SVs"
+output: null_document
+---
+
+# Setup
+
+## My Libs
+```{r}
+
+path.base = '../../../'
+
+path.pannagram = paste(path.base, '../pannagram/', sep = '')
+
+source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
+source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
+source(paste(path.pannagram, 'utils/utils.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/orfplot.R', sep = ''))
+```
+
+# Libs and paths
+```{r, message=FALSE}
+# library(cultevo)  #hammingdists
+library(ggplot2)
+# library(ggtree)
+# library('ggmsa')
+library(gridExtra)
+library(dplyr)
+library(tidyverse)
+library(ggrepel)
+# library(egg)
+
+path.base = '../../../'
+path.figures = paste(path.base, '02_analysis/07_saturation/03_figures/', sep = '')
+path.satur = paste(path.base, '02_analysis/03_annotation/01_data/', sep = '')
+
+file.loci = 'genes_v05_freq_loci.txt'
+file.mrna = 'genes_v05_freq_mrna.txt'
+
+```
+
+
+# Gene lengths - DO NOT RUN AGAIN
+```{r}
+
+path.pan.genes = '../../../01_data/04_annotation/02_pannagram/genes_v05/'
+gff.files <- list.files(path = path.pan.genes, pattern = "\\.gff$", full.names = F)
+gff.files = gff.files[!grepl('genes_v05_pangen_', gff.files)]
+
+accessions <- gsub('.gff', '', gff.files)
+accessions <- gsub('genes_v05_', '', accessions)
+
+gff.all.len = c()
+for(acc in accessions){
+  pokaz(acc)
+  gff1 = read.table(paste(path.pan.genes, 'genes_v05_',acc, '.gff', sep = ''), stringsAsFactors = F)
+  gff1 = gff1[gff1$V3 == 'gene',]
+  gff1$names = sapply(gff1$V9, function(s) strsplit(s, ';')[[1]][1])
+  gff1$len = abs(gff1$V5 - gff1$V4) + 1
+
+  gff.all.len = rbind(gff.all.len, gff1[,c('names', 'len')])
+}
+
+
+median.len = tapply(gff.all.len$len, gff.all.len$names, median)
+
+# write.table(as.matrix(median.len), paste(path.satur, 'genes_v05_length.txt', sep = ''), quote = F, row.names = T, col.names = F)
+
+
+```
+
+
+# Genes
+## Saturation 
+```{r}
+
+
+x = read.table(paste(path.satur, file.loci, sep = ''))
+x = x[, -ncol(x)]
+
+x.len = read.table(paste(path.satur, 'genes_v05_length.txt', sep = ''), stringsAsFactors = F, row.names = 1)
+x.len = x.len[rownames(x),,drop = F]
+
+if(sum(is.na(x.len)) > 0){
+  stop('Wrong gene names in the length file')
+}
+
+
+
+loci.stat.all = c()
+for(n.acc in 2:27){
+  pokaz('# accessions', n.acc)
+  for(n.rep in 1:20){
+    accs = sample(1:27, n.acc, replace = FALSE)
+    x.tmp = x[,accs]
+    x.tmp.freq = rowSums(x.tmp)
+    
+    
+    n.core = sum(x.tmp.freq == n.acc)
+    n.priv = sum(x.tmp.freq == 1)
+    n.pan = sum(x.tmp.freq != 0)
+    n.seg = n.pan  - n.core
+    
+    len.core = sum(x.len[x.tmp.freq == n.acc,1])
+    len.priv = sum(x.len[x.tmp.freq == 1,1])
+    len.pan = sum(x.len[x.tmp.freq != 0,1])
+    len.seg = len.pan - len.core
+    
+    loci.stat.all = rbind(loci.stat.all, 
+                          c(n.acc, n.rep, n.core, n.pan, n.seg, len.core, len.pan, len.seg))
+  }
+}
+colnames(loci.stat.all) <- c('n.acc', 'n.rep', 'n.core', 'n.pan', 'n.seg', 'len.core', 'len.pan', 'len.seg')
+loci.stat.all = as.data.frame(loci.stat.all)
+
+
+```
+
+# mRNA
+## Saturation
+```{r}
+
+x = read.table(paste(path.satur, file.mrna, sep = ''))
+x = x[, -ncol(x)]
+
+x.len = read.table(paste(path.satur, 'genes_v05_length.txt', sep = ''), stringsAsFactors = F, row.names = 1)
+x.len = x.len[rownames(x),,drop = F]
+
+if(sum(is.na(x.len)) > 0){
+  stop('Wrong gene names in the length file')
+}
+
+
+loci.stat.all.mrna = c()
+for(n.acc in 2:27){
+  pokaz('# accessions', n.acc)
+  for(n.rep in 1:20){
+    accs = sample(1:27, n.acc, replace = FALSE)
+    x.tmp = x[,accs]
+    x.tmp.freq = rowSums(x.tmp)
+    
+    
+    n.core = sum(x.tmp.freq == n.acc)
+    n.priv = sum(x.tmp.freq == 1)
+    n.pan = sum(x.tmp.freq != 0)
+    n.seg = n.pan  - n.core
+    
+    len.core = sum(x.len[x.tmp.freq == n.acc,1])
+    len.priv = sum(x.len[x.tmp.freq == 1,1])
+    len.pan = sum(x.len[x.tmp.freq != 0,1])
+    len.seg = len.pan - len.core
+    
+    loci.stat.all.mrna = rbind(loci.stat.all.mrna, 
+                          c(n.acc, n.rep, n.core, n.pan, n.seg, len.core, len.pan, len.seg))
+  }
+}
+colnames(loci.stat.all.mrna) <- 
+  c('n.acc', 'n.rep', 'n.core', 'n.pan', 'n.seg', 'len.core', 'len.pan', 'len.seg')
+loci.stat.all.mrna = as.data.frame(loci.stat.all.mrna)
+
+
+```
+
+
+# Plot mRNA and genes
+## Length
+```{r}
+df1 = loci.stat.all.mrna[,c('n.acc', 'len.seg')]
+df1$type = 'raw annotation'
+df2 = loci.stat.all[,c('n.acc', 'len.seg')]
+df2$type = 'cleaned annotation'
+
+
+df = rbind(df1, df2)
+
+
+
+p = ggplot(df, aes(x = n.acc, y = len.seg, color = type)) +
+  geom_jitter(alpha = 0.5, size = 1, width = 0.1) +
+  scale_color_manual(values=c('raw annotation' = '#57A6A1', 'cleaned annotation' = '#D2649A'),
+                     name = NULL) +
+  stat_summary(fun = mean, geom = "line", aes(group = type), size = 1) +
+  # ylim(c(0, 100000)) +
+  theme_minimal() + ylab('Length of segregating genes') + xlab('Number of genomes') + 
+  theme(legend.position = "bottom")
+
+p
+
+pdf(paste(path.figures, 'satur_segreg_mrna_loci_len.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+## Number
+```{r}
+df1 = loci.stat.all.mrna[,c('n.acc', 'n.seg')]
+df1$type = 'raw annotation'
+df2 = loci.stat.all[,c('n.acc', 'n.seg')]
+df2$type = 'consensus annotation'
+
+
+df = rbind(df1, df2)
+
+
+p = ggplot(df, aes(x = n.acc, y = n.seg, color = type)) +
+  geom_jitter(alpha = 0.5, size = 1, width = 0.1) +
+  scale_color_manual(values=c('raw annotation' = '#57A6A1', 'consensus annotation' = '#D2649A'),
+                     name = NULL) +
+  stat_summary(fun = mean, geom = "line", aes(group = type), size = 1) +
+  # ylim(c(0, 100000)) +
+  theme_minimal() + ylab('Number of segregating genes') + xlab('Number of genomes') + 
+  theme(legend.position = "bottom")
+
+p
+
+pdf(paste(path.figures, 'satur_segreg_mrna_loci_num.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+```
+
+
+
+# Only SVs from the graph
+## Reading
+```{r}
+
+sv.bin = readRDS('../../04_sv/01_data/sv_bin_ingraph.rds')
+sv.bin = sv.bin[,-1]
+sv.bin = sv.bin[rowSums(sv.bin) > 0,]
+sv.bin = sv.bin[rowSums(sv.bin) != 27,]
+
+sv.len = as.numeric(sapply(rownames(sv.bin), function(s) strsplit(s, '\\|')[[1]][2]))
+
+
+```
+
+## Saruration
+```{r}
+
+sv.stat.all = c()
+for(n.acc in 2:27){
+  pokaz('# accessions', n.acc)
+  for(n.rep in 1:20){
+    accs = sample(1:27, n.acc, replace = FALSE)
+    x.tmp = sv.bin[,accs]
+    x.tmp.freq = rowSums(x.tmp)
+    
+    
+    n.core = sum(x.tmp.freq == n.acc)
+    n.priv = sum(x.tmp.freq == 1)
+    n.pan = sum(x.tmp.freq != 0)
+    n.seg = n.pan  - n.core
+    
+    len.core = sum(sv.len[x.tmp.freq == n.acc])
+    len.priv = sum(sv.len[x.tmp.freq == 1])
+    len.pan = sum(sv.len[x.tmp.freq != 0])
+    len.seg = len.pan - len.core
+    
+    sv.stat.all = rbind(sv.stat.all, 
+                          c(n.acc, n.rep, n.core, n.pan, n.seg, len.core, len.pan, len.seg))
+  }
+}
+
+
+colnames(sv.stat.all) <- c('n.acc', 'n.rep', 'n.core', 'n.pan', 'n.seg', 'len.core', 'len.pan', 'len.seg')
+sv.stat.all = as.data.frame(sv.stat.all)
+
+
+
+
+```
+
+
+
+# Genome
+## Saturation
+```{r}
+
+library(rhdf5)
+path.msa = '../../../01_data/02_alignment/pannagram_v05/'
+aln.type = 'v_'
+
+
+
+genome.stat.all = c()
+
+for(n.rep in 1:5){
+  pokaz('# rep', n.rep)
+  accs = sample(1:27, 27, replace = FALSE)
+  s.accs = accessions[accs]
+  for(i.chr in 1:5){
+    file = paste(path.msa, aln.type, i.chr, '_', i.chr, '_ref_0.h5', sep = '')
+    pos.coverage = 0
+    for(n.acc in 1:27){
+      pokaz('Chr', i.chr, '# acc', n.acc)
+      s.acc = s.accs[n.acc]
+      s = paste('/accs/', s.acc, sep = '')  
+      v = h5read(file, s)
+      pos.coverage = pos.coverage + ((v != 0) & !(is.na(v))) * 1
+      
+      if(n.acc < 2)  next
+      
+      len.core = sum(pos.coverage == n.acc)
+      len.priv = sum(pos.coverage == 1)
+      len.pan = sum(pos.coverage != 0)
+      len.seg = len.pan - len.core
+      
+      genome.stat.all = rbind(genome.stat.all, 
+                            c(n.acc, len.core, len.pan, len.seg, i.chr))
+      
+    }
+  }
+}
+
+colnames(genome.stat.all) <- c('n.acc', 'len.core', 'len.pan', 'len.seg', 'i.chr')
+genome.stat.all = as.data.frame(genome.stat.all)
+
+saveRDS(genome.stat.all, '../../../02_analysis/07_saturation/01_data/genome_stat_all.rds')
+
+
+genome.stat.all = readRDS('../../../02_analysis/07_saturation/01_data/genome_stat_all.rds')
+
+genome.stat.all[(genome.stat.all$n.acc == 11) & (genome.stat.all$i.chr == 1),]
+
+
+
+genome.stat.all = genome.stat.all[-(1:273),]
+genome.stat.all$n.rep = sort(rep(c(1,2,3,4,5), nrow(genome.stat.all) / 5))
+
+genome.stat.all <- genome.stat.all %>%
+  group_by(n.acc, n.rep) %>%
+  summarise(
+    len.core = sum(len.core),
+    len.pan = sum(len.pan),
+    len.seg = sum(len.seg),
+    i.chr = sum(i.chr),
+    .groups = 'drop'
+  )
+
+
+```
+
+# All together: Genes and Mobilome pan and core
+## Combine dataframes
+```{r}
+df1 = rbind(data.frame(n.acc = loci.stat.all$n.acc, 
+                       value = loci.stat.all$len.pan,
+                       type = 'pan'),
+            data.frame(n.acc = loci.stat.all$n.acc, 
+                       value = loci.stat.all$len.seg,
+                       type = 'core'))
+df1$source = 'Genes'
+
+
+df2 = rbind(
+            data.frame(n.acc = sv.stat.all$n.acc,
+                       value = sv.stat.all$len.seg,
+                       type = 'core'),
+            data.frame(n.acc = sv.stat.all$n.acc, 
+                       value = sv.stat.all$len.pan,
+                       type = 'pan'))
+df2$source = 'Mobilome'
+
+
+df3 = rbind(data.frame(n.acc = genome.stat.all$n.acc, 
+                       value = genome.stat.all$len.pan,
+                       type = 'pan'),
+            data.frame(n.acc = genome.stat.all$n.acc, 
+                       value = genome.stat.all$len.seg,
+                       type = 'core'))
+df3$source = 'Genome'
+
+
+df = rbind(df1, df2)
+df = rbind(df, df3)
+df$init = df$value
+
+
+norm.flag = F
+norm.mode = 2
+
+if (norm.flag) {
+  for (s.source in unique(df$source)) {
+    for (s.type in c('pan', 'core')) {
+      idx.tmp <- (df$source == s.source) & (df$type == s.type)
+      df.tmp <- df[idx.tmp,]
+      
+      if (s.type == 'core') {
+        df.tmp$value <- (-1) * df.tmp$value
+      }
+      
+      if (norm.mode == 1) {
+        m1 <- mean(df.tmp$value[df.tmp$n.acc == 2])
+        m2 <- mean(df.tmp$value[df.tmp$n.acc == 27])
+        df.tmp$value <- (df.tmp$value - m1) / (m2 - m1)
+      } else {
+        m <- mean(df.tmp$value[df.tmp$n.acc == 2])
+        df.tmp$value <- df.tmp$value - m
+      }
+      
+      if (s.type == 'core') {
+        df.tmp$value <- (-1) * df.tmp$value
+        df.tmp$value <- df.tmp$value
+      }
+      
+      df[idx.tmp,] <- df.tmp
+    }
+  }
+}
+
+df$type = factor(df$type, levels = c('pan', 'core'))
+df$comb = paste(df$source, df$type, sep = ':')
+
+
+
+highlight_points <- df %>%
+  filter(n.acc %in% c(2, 27)) %>%
+  group_by(comb, n.acc) %>%
+  summarize(mean = mean(init), value = mean(value), type = unique(type),
+            source = unique(source), .groups = 'drop')
+highlight_points$label = paste(round(highlight_points$mean / 1000000, 1), 'M', sep = '')
+
+```
+
+# Init
+```{r}
+df1 = rbind(data.frame(n.acc = loci.stat.all$n.acc, 
+                       value = loci.stat.all$len.pan,
+                       type = 'pan'),
+            data.frame(n.acc = loci.stat.all$n.acc, 
+                       value = loci.stat.all$len.core,
+                       type = 'core'))
+df1$source = 'Genes'
+
+
+df2 = rbind(
+            # data.frame(n.acc = sv.stat.all$n.acc, 
+            #            value = sv.stat.all$len.core,
+            #            type = 'core'),
+            data.frame(n.acc = sv.stat.all$n.acc, 
+                       value = sv.stat.all$len.pan,
+                       type = 'pan'))
+df2$source = 'Mobilome'
+
+
+df3 = rbind(data.frame(n.acc = genome.stat.all$n.acc, 
+                       value = genome.stat.all$len.pan,
+                       type = 'pan'),
+            data.frame(n.acc = genome.stat.all$n.acc, 
+                       value = genome.stat.all$len.core,
+                       type = 'core'))
+df3$source = 'Genome'
+
+
+df = rbind(df1, df2)
+df = rbind(df, df3)
+df$init = df$value
+
+
+norm.flag = T
+norm.mode = 2
+
+if (norm.flag) {
+  for (s.source in unique(df$source)) {
+    for (s.type in c('pan', 'core')) {
+      idx.tmp <- (df$source == s.source) & (df$type == s.type)
+      df.tmp <- df[idx.tmp,]
+      
+      if (s.type == 'core') {
+        df.tmp$value <- (-1) * df.tmp$value
+      }
+      
+      if (norm.mode == 1) {
+        m1 <- mean(df.tmp$value[df.tmp$n.acc == 2])
+        m2 <- mean(df.tmp$value[df.tmp$n.acc == 27])
+        df.tmp$value <- (df.tmp$value - m1) / (m2 - m1)
+      } else {
+        m <- mean(df.tmp$value[df.tmp$n.acc == 2])
+        df.tmp$value <- df.tmp$value - m
+      }
+      
+      if (s.type == 'core') {
+        df.tmp$value <- (-1) * df.tmp$value
+        df.tmp$value <- df.tmp$value
+      }
+      
+      df[idx.tmp,] <- df.tmp
+    }
+  }
+}
+
+df$type = factor(df$type, levels = c('pan', 'core'))
+df$comb = paste(df$source, df$type, sep = ':')
+
+
+
+highlight_points <- df %>%
+  filter(n.acc %in% c(2, 27)) %>%
+  group_by(comb, n.acc) %>%
+  summarize(mean = mean(init), value = mean(value), type = unique(type),
+            source = unique(source), .groups = 'drop')
+highlight_points$label = paste(round(highlight_points$mean / 1000000, 1), 'M', sep = '')
+
+```
+
+
+## Plot
+```{r}
+satur.cols = c("Genes"='#57A6A1',  "Mobilome"  ='#898B8A', 
+               "Genome"='#D2649A')
+
+p = ggplot(df, aes(x = n.acc, y = value, color = source, group = source)) +
+  # geom_jitter(alpha = 0.2, size = 1, width = 0.1) +
+  scale_color_manual(values=satur.cols, name = NULL) +
+  stat_summary(fun = mean, geom = "line", aes(group = comb), size = 1) +
+  theme_bw() +
+  ylab('Change in length (bp)') + xlab('Number of genomes') +
+  # scale_x_log10()  + 
+  # scale_y_log10()  + 
+  theme(legend.position = "bottom")
+p
+# 
+# p + facet_grid(rows = vars(type))
+# 
+p1 = p + scale_x_log10() + scale_y_log10()
+p1
+# 
+p2 = p1 +  facet_grid(rows = vars(source), scales = "free_y", space = "free_y")
+# 
+# 
+pdf(paste(path.figures, 'p_logx.pdf', sep = ''), width = 5, height = 20)
+print( p2)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+```{r}
+p.print = p + facet_grid(rows = vars(type), scales = "free_y", space = "free_y",
+             labeller = labeller(type = c('pan' = 'Pan', 'core' = 'Core'))) + 
+  
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black")) 
+
+if(!norm.flag){
+  p.print = p.print + ylab('Unnormalised length')
+  file.p.print = 'satur_all_init.pdf'
+} else if(norm.mode == 1){
+  p.print = p.print + ylab('Normalised length')
+  file.p.print = 'satur_all_norm.pdf'
+} else if(norm.mode == 2){
+  file.p.print = 'satur_all_change.pdf'
+}
+
+pdf(paste(path.figures, file.p.print, sep = ''), width = 5, height = 4)
+print( p.print)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+p2 <- p + geom_text_repel(data = highlight_points, aes(x = n.acc, y = value, label = label, color = source),
+                          vjust = -1, hjust = 1,direction = "y",
+                          size = 3, inherit.aes = F, show.legend = FALSE)
+
+sclae.step = 10^7
+custom_labels <- function(x) {
+  paste0(x / sclae.step * 10, "M")
+}
+
+p2 = p2 + xlim(c(-0, 27)) + 
+  facet_grid(rows = vars(type), scales = "free_y", space = "free_y",
+             labeller = labeller(type = c('pan' = 'Pan', 'core' = 'Core'))) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black")) +
+  scale_y_continuous(breaks = seq(-10 * sclae.step, 20 * sclae.step, by = sclae.step), 
+                     labels = custom_labels) 
+
+p2
+
+```
+
+
+## ax^b
+```{r}
+fitPowerLaw <- function(df.tmp) {
+  
+  if(mean(df.tmp$value) < 0){
+    df.tmp$value = (-1) * df.tmp$value
+    a.sign = -1
+  } else {
+    a.sign = +1
+  }
+  
+  df.tmp$value = df.tmp$value - df.tmp$value[df.tmp$n.acc == 2]
+  df.tmp$n.acc = df.tmp$n.acc - 2
+  
+  df.tmp = df.tmp[df.tmp$n.acc != 0,]
+  
+  # model <- lm(log(value) ~ log(n.acc), data = df.tmp)
+  # 
+  # coefs <- coef(model)
+  # return(data.frame(
+  #   comb = unique(df.tmp$comb),
+  #   a = exp(coefs[1]) * a.sign,
+  #   b = coefs[2]
+  # ))
+  
+  
+  model <- lm(value ~ n.acc + log(n.acc), data = df.tmp)
+  coefs <- coef(model)
+  return(data.frame(
+    comb = unique(df.tmp$comb),
+    a = coefs[2],
+    b = coefs[3]
+  ))
+  
+  
+}
+
+mean_values <- df %>%
+  group_by(comb, n.acc) %>%
+  summarise(value = mean(value), type = unique(type),
+            source = unique(source), .groups = 'drop')
+
+# Apply approximation for every comb
+fits <- mean_values %>% group_by(comb) %>% do(fitPowerLaw(.))
+
+# fits$a.lab = paste0(round(fits$a / sclae.step * 10,1), "M", sep = '')
+# fits$b.lab = round(fits$b, 2)
+# fits$lab = paste('a=', fits$a.lab, ', p=', fits$b.lab, sep = '')
+
+fits$lab = paste('italic(a/b)==', round(fits$a / fits$b,2), sep = '')
+#
+
+fits = cbind(fits, mean_values[mean_values$n.acc == 15, c('type', 'value', 'n.acc', 'source')])
+
+
+p3 = p2 + geom_text(data = fits, aes(x = n.acc, y = value,
+                                     # color=source,
+                                     label = lab),
+                    parse = TRUE,
+               color = 'black',
+                          vjust = 1, 
+                    # hjust = 1,direction = "y",
+                          size = 3, inherit.aes = F, show.legend = FALSE)
+p3
+
+
+text.data <- data.frame(x = 0, y = Inf,
+                        type = factor(c('pan', 'core'), levels = c('pan', 'core')), 
+                        label = c("Approximation: italic(a) * x + italic(b) * log(italic(x))", ''),
+                        source = 'Genome')
+
+
+p4 = p3 + geom_text(data = text.data, aes(x = x, y = y, label = label),
+               hjust = 0, vjust = 2, size = 4, 
+               color = "black",
+               parse = TRUE)
+ 
+ 
+
+p4
+
+
+pdf(paste(path.figures, 'satur_all_power.pdf', sep = ''), width = 5, height = 4)
+print(p4)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+

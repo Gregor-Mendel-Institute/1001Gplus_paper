@@ -14,7 +14,7 @@ path.base = '../../../'
 path.pannagram = paste(path.base, '../pannagram/', sep = '')
 
 source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
-source(paste(path.pannagram, 'sv/graph_refinement.R', sep = ''))
+source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
 source(paste(path.pannagram, 'utils/utils.R', sep = ''))
 source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
 source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
@@ -53,13 +53,197 @@ msaplot(mx)
 ## Refine
 ```{r}
 n.flank = 30
-res = refineMafft(mx, n.flank = n.flank)
+  sim.cutoff = 0.2
+  s.nt.fake = '!'
+  
+  
+  # Create the matrix with positions
+  mx.pos = matrix(0, nrow = nrow(mx), ncol = ncol(mx), 
+                  dimnames = list(rownames(mx), NULL))
+  for(irow in 1:nrow(mx.pos)){
+    pos.row = as.numeric(strsplit(rownames(mx)[irow], '\\|')[[1]][3:4])
+    pos.row = pos.row[1]:pos.row[2] 
+    pos.row = 1:length(pos.row)
+    
+    pos.filled = which(mx[irow,] != '-')
+    pos.filled = pos.filled[-(1:n.flank)]
+    pos.filled <- pos.filled[-((length(pos.filled) - n.flank + 1):length(pos.filled))]
+    
+    mx.pos[irow, pos.filled] = pos.row
+  }
+  
+  # Remove flanking regions
+  mx[mx.pos == 0] = '-'
+  idx.col.remain = (colSums(mx != '-') != 0)
+  mx = mx[,idx.col.remain]
+  mx.pos = mx.pos[,idx.col.remain]
+  
+  # Save variables
+  mx.init = mx
+  mx.pos.init = mx.pos
+  
+  # Plot
+  # p0 = msaplot(mx)
+  # p0
+  
+  # --- --- --- --- --- --- --- ---
+  # ---- Split ----
+
+  
+```
+
+
+```{r}
+
+msadiff(mx.rest, i.ref = 2)
+
+```
+
+
+# Define the phylogeny to construct the alignment
+```{r}
+
+  
+# Final alignment
+mx.ok = c()
+mx.pos.ok = c()
+
+# To arrange a cycle
+mx.rest = mx.init
+mx.pos.rest = mx.pos.init
+
+for(n.round in 1:3){
+    # pokaz('Disentangle Round', n.round)
+    
+    mx = mx.rest           # The matrix you work with and change values
+    mx.pos = mx.pos.rest   # The matrix you work with and change values
+    
+    # Diversity by each position
+    aln.len = ncol(mx)
+    mx = toupper(mx)
+    s.nts = c('A', 'C', 'G', 'T')
+    pos.profile = matrix(0, nrow = 4, ncol = aln.len, dimnames = list(c(s.nts, NULL)))
+    for(s.nt in s.nts){
+      pos.profile[s.nt,] = colSums(mx == s.nt)
+    }
+    pos.variation = (colSums(pos.profile == 0) != 3) * 1
+    
+    # Define blocks, were the alignment non well
+    blocks.all = c()
+    for(i.seq in 1:nrow(mx)){
+      s = mx[i.seq,]
+      blocks = findOnes((s != '-') *1)
+      blocks$len = blocks$end - blocks$beg + 1
+      if(nrow(blocks) == 0) next
+      
+      # Estimate diversity within each block
+      blocks$acc = rownames(mx)[i.seq]
+      for(irow in 1:nrow(blocks)){
+        idx.block = blocks$beg[irow]:blocks$end[irow]
+        blocks$pi[irow] = sum(pos.variation[idx.block]) / blocks$len[irow]
+      }
+      
+      blocks.all = rbind(blocks.all, blocks)
+    }
+    if(nrow(blocks) == 0){
+      # pokaz('Exit 1')
+      mx.ok = cbind(mx.ok, mx)
+      mx.pos.ok = cbind(mx.pos.ok, mx.pos)
+      break
+    } 
+    
+    blocks = blocks.all
+    rm(blocks.all)
+    blocks = blocks[blocks$pi>sim.cutoff,,drop = F]
+    blocks = blocks[order(-blocks$pi),,drop = F]
+    
+    if(nrow(blocks) == 0){
+      # pokaz('Exit 2')
+      mx.ok = cbind(mx.ok, mx)
+      mx.pos.ok = cbind(mx.pos.ok, mx.pos)
+      break
+    }
+    
+    blocks$remove = 0
+    for(irow in 1:nrow(blocks)){
+      idx.block = blocks$beg[irow]:blocks$end[irow]
+      blocks$pi[irow] = sum(pos.variation[idx.block]) / blocks$len[irow]
+      if(blocks$pi[irow] <= sim.cutoff){
+        # stop()
+        # pokaz(irow)
+        next
+      } 
+      
+      seq.tmp = mx[blocks$acc[irow], idx.block]  
+      for(s.nt in s.nts){
+        pos.profile[s.nt,idx.block] = pos.profile[s.nt,idx.block] - 1 * (seq.tmp == s.nt)
+      }
+      
+      blocks$remove[irow] = 1
+      pos.variation[idx.block] = (colSums(pos.profile[,idx.block,drop = F] == 0) != 3) * 1
+    }
+    
+    
+    # # Optional
+    # for(irow in 1:nrow(blocks)){
+    #   idx.block = blocks$beg[irow]:blocks$end[irow]
+    #   loneliness = max(pos.profile[,idx.block,drop=F])
+    #   if(loneliness == 1){
+    #     # pokaz(irow)
+    #     # stop()
+    #     blocks$remove[irow] = 1
+    #   } 
+    # }
+    
+    
+    
+    # Remove blocks with very high diversity
+    for(irow in 1:nrow(blocks)){
+      if(blocks$remove[irow] == 0) next
+      idx.block =  blocks$beg[irow]:blocks$end[irow]
+      mx[blocks$acc[irow],idx.block] = s.nt.fake
+    }
+    
+    
+    # Well alignmed positions
+    mask.ok = (mx != s.nt.fake)
+    mx[!mask.ok] = '-'
+    mx.pos[!mask.ok] = 0
+    
+    mx.ok = cbind(mx.ok, mx)
+    mx.pos.ok = cbind(mx.pos.ok, mx.pos)
+    
+    # The rest for the next round
+    
+    mx.rest[mask.ok] = '-'
+    mx.pos.rest[mask.ok] = 0
+    
+    cols.rest = colSums(mx.rest != '-') > 0
+    mx.rest = mx.rest[, cols.rest, drop = F]
+    mx.pos.rest = mx.pos.rest[, cols.rest, drop = F]
+    
+    if(ncol(mx.rest) == 0){
+      # pokaz('Exit 3')
+      break
+    }
+    
+  }
+  
+  
+  if(sum(rowSums(mx.pos.ok != 0) != rowSums(mx.pos.init != 0)) != 0) {
+    pokazAttention('Not enough rounds') 
+  }
+  if(sum(dim(mx.ok) != dim(mx.pos.ok)) != 0) stop('Sizes of matrices are different')
+  
+
+  
+  
 ```
 
 ## Find clusters
 
 ```{r}
-mx.cut = res$mx
+mx.cut = mx.ok
 mx.common = mx.cut[,colSums(mx.cut != '-') >= 2]
 
 msaplot(mx.common)
@@ -71,11 +255,11 @@ plot(hc)
 
 threshold = 0.3
 clusters = cutree(hc, h = threshold)
-clusters = sort(clusters)
+clusters.sort = sort(clusters)
 
 table(clusters)
 
-msaplot(mx[names(clusters),])
+msaplot(mx.init[names(clusters.sort),])
 
 ```
 
@@ -87,13 +271,14 @@ msaplot(mx[names(clusters),])
 
 Sys.setenv(PATH = paste("/Users/annaigolkina/miniconda3/envs/bioinf/bin", Sys.getenv("PATH"), sep=":"))
 
-
+mx = mx.init
 seqs = mx2seq(mx)
 path.mattf.tmp = '/Volumes/Samsung_T5/vienn/alignment/new/mafft_tmp/tmp/'
 pref = 'tmp4.fasta'
 
 s.cons.all = c()
 mx.all = list()
+pos.all = list()
 for(i.cl in 1:max(clusters)){
   pokaz('Cluster', i.cl)
   s = seqs[clusters == i.cl]
@@ -118,17 +303,19 @@ for(i.cl in 1:max(clusters)){
   
   msadiff(mx.cl)
   
-  # CLEAN UP THE ALIGNMENT!!!!!
-  
+
+  # Save the results
   mx.all[[i.cl]] = mx.cl
-  
+  pos.all[[i.cl]] = mx2pos(mx.cl)
   s.cons.all[i.cl] = nt2seq(mx2cons(mx.cl))
   
+  # CLEAN UP THE ALIGNMENT!!!!!
   command <- paste('rm ', file.tmp, sep = '')
   system(command)
   command <- paste('rm ', file.out, sep = '')
   system(command)
 }
+
 
 file.tmp = paste(path.mattf.tmp,pref, '_cl_cons.fasta', sep = '')
 file.out = paste(path.mattf.tmp,pref, '_cl_cons_out.fasta', sep = '')
@@ -144,26 +331,58 @@ mx.cl = aln2mx(aln.cl)
 msaplot(mx.cl)
 
 
-dotplot.s(s.cons.all[1], s.cons.all[2], 15, 12)
+mx.cl.pos = mx2pos(mx.cl)
+mx.final = c()
+mx.final.pos = c()
+for(i.cl in 1:max(clusters)){
+  mx.final.tmp = mx.all[[i.cl]]
+  mx.final.pre = matrix('-', nrow = nrow(mx.final.tmp), ncol = ncol(mx.cl))
+  mx.final.pre[,mx.cl[i.cl,] != '-'] = mx.final.tmp
+  rownames(mx.final.pre) = rownames(mx.final.tmp)
+  mx.final = rbind(mx.final, mx.final.pre)
+}
+
+msaplot(mx.final)
+
+msaplot(mx.final.tmp)
+
+msadiff(mx.cl, i.ref = 3)
+
+
+# dotplot.s(s.cons.all[1], s.cons.all[2], 15, 12)
 
 
 
 ```
+## Tisual testing
+```{r}
+
+k = 3
+mx.tmp = mx.all[[k]]
+mx.tmp = mx.cl
+
+msaplot(mx.tmp)
+
+
+mx.mask = maskUnaligned(mx.tmp)
+if(is.null(mx.mask)) stop('everything is ok')
+mx.tmp = mx.tmp
+mx.tmp[!mx.mask] = 'N'
+
+
+msaplot(mx.tmp)
+
+```
+
+
 
 # Find blocks with poor alignment
 ```{r}
 
 
 # Diversity by each position
-mx.len = ncol(mx.cl)
-mx.cl = toupper(mx.cl)
-s.nts = c('A', 'C', 'G', 'T')
-pos.profile = matrix(0, nrow = 4, ncol = mx.len, dimnames = list(c(s.nts, NULL)))
-for(s.nt in s.nts){
-  pos.profile[s.nt,] = colSums(mx.cl == s.nt)
-}
-pos.variation = (colSums(pos.profile == 0) != 3) * 1
-
+pos.profile = getProfile(mx, gap.flag = T)
+pos.variation = (colSums(pos.profile == 0) != (nrow(pos.profile) - 1)) * 1
 
 plot(pos.variation)
 
@@ -171,6 +390,7 @@ plot(pos.variation)
 
 sim.cutoff = 0.3
 
+mx.len = ncol(mx)
 wnd.len = max(round(mx.len * 0.01), 15)
 n.mismatch = round(wnd.len * sim.cutoff)
 
@@ -179,15 +399,13 @@ d = pos.variation
 
 d.sum <- d
 for (i in 1:(wnd.len - 1)) {
-  # Сдвигаем вектор
-  d.shift <- lag(d, n = i, default = 0)
-  # Суммируем с исходным вектором сумм
+  d.shift <- c(tail(d, mx.len - i), rep(0, i))
   d.sum <- d.sum + d.shift
 }
-d.sum = d.sum[-(1:(wnd.len-1))]
+# d.sum = d.sum[-(1:(wnd.len-1))]
 
 
-plot(d.sum)
+plot(d.sum < n.mismatch)
 
 ```
 

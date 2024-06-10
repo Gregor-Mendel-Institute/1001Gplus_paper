@@ -72,7 +72,11 @@ p
 
 
 pdf(paste(path.figures, 'pb27_map.pdf', sep = ''), width = 8, height = 3.5)
-print(p)     # Plot 1 --> in the first page of PDF
+print(p)  
+dev.off()
+
+pdf(paste(path.figures, 'pb27_map.pdf', sep = ''), width = 11, height = 6)
+print(p)  
 dev.off()
 
 ```

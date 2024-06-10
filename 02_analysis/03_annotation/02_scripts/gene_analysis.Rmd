@@ -1,6 +1,6 @@
 ---
 title: "Analysis of annotation groups and genes"
-output: html_notebook
+output: null_document
 ---
 
 # Setup
@@ -12,12 +12,12 @@ library(beepr)
 s.version = 'v05'
 
 path.base = '../../../'
-path.genes = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes_',s.version,'/', sep = '')
-path.expr = paste(path.base, '01_data_common/06_expression/', sep = '')
+path.genes = paste(path.base, '01_data/04_annotation/02_pannagram/genes_',s.version,'/', sep = '')
+path.expr = paste(path.base, '01_data/05_expression/', sep = '')
 
 
-path.tair10 = paste(path.base, '01_data_common/01_tair10/', sep = '')
-path.svs = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', sep = '')
+path.tair10 = paste(path.base, '01_data/01_tair10/', sep = '')
+path.svs = paste(path.base, '01_data/04_annotation/02_pannagram/svs/', sep = '')
 file.pangen.genes = paste('genes_',s.version,'_pangen_all.gff', sep = '')
 
 path.figures  = paste(path.base, '02_analysis/03_annotation/03_figures/', sep = '')
@@ -974,7 +974,7 @@ for(i.f in 1:length(accessions)){
 ```{r}
 library(stringr)
 
-path.annot = paste(path.base, '01_data_common/02_annot_denovo/03_new_genes/', sep = '')
+path.annot = paste(path.base, '01_data/04_annotation/04_new_genes/', sep = '')
 file.annot = 'new_genes_by_Anna_Annotation.clean.with_final_class.txt'
 
 haim.ann = read.delim(paste(path.annot, file.annot, sep = ''), stringsAsFactors = F)
@@ -1061,10 +1061,69 @@ p = ggplot(haim.go, aes(x = Var2, y = Var1, color = val.category, size = value))
   xlab(NULL) + ylab(NULL) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 p
 
+# 
+# pdf(paste(path.figures, 'go_categories.pdf', sep = ''), width = 8, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
-pdf(paste(path.figures, 'go_categories.pdf', sep = ''), width = 8, height = 4)
-print(p)     # Plot 1 --> in the first page of PDF
-dev.off()
+```
+
+
+### Plot GO - freq
+```{r}
+
+tmp.freq = read.table('/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/02_analysis/03_annotation/01_data/genes_v05_freq_loci.txt')
+rownames(tmp.freq) = gsub('ID=', '',rownames(tmp.freq))
+
+
+
+haim.go = table(haim.ann$UNIPROT.class, tmp.freq[rownames(haim.ann),]$freq)
+# haim.go = haim.go[,!(colnames(haim.go) %in% c(s.annot$te, s.annot$no.homology, s.annot$te.like))]
+# haim.go.total = rowSums(haim.go)
+# haim.go = cbind(haim.go, total = haim.go.total)
+haim.go = t(haim.go[!rowSums(haim.go) == 0,])
+
+tot.cnt = sort(colSums(haim.go))
+haim.go = reshape2::melt(haim.go)
+haim.go$Var2 = factor(haim.go$Var2, levels = names(tot.cnt))
+# haim.go$Var1 = factor(haim.go$Var1, levels = c('total',
+#                                                s.annot$other.sp,
+#                                                s.annot$prot.thal,
+#                                                s.annot$prot.tair10,
+#                                                s.annot$nt.tair10))
+
+
+haim.go <- haim.go %>%
+  mutate(val.category = cut(value, 
+                              breaks = c(-Inf, 5, 10, 50, 100, 200, Inf), 
+                              labels = c("[1-5]","(5-10]", "(10-50]", "(50-100]", "(100-200]", ">200")))
+
+n.extra = 0
+colors_go = col_generator(length(unique(haim.go$val.category))+n.extra)
+if(n.extra != 0 )colors_go = colors_go[-(1:n.extra)]
+names(colors_go) = unique(haim.go$val.category)
+
+
+colors_go <- colorRampPalette(c('#AED8CC',"#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length(unique(haim.go$val.category)))
+names(colors_go) = unique(haim.go$val.category)
+
+
+p = ggplot(haim.go, aes(x = Var2, y = Var1, color = val.category, size = value)) + 
+  geom_point() + theme_minimal() + 
+  scale_color_manual(values = colors_go, name = "# of genes")  +
+  # geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
+  #             aes(x=Var2, y=Var1, label = round(value, 2)), 
+  #             size = 2.5, color = 'black', 
+  #           nudge_x = 0.3,
+  #           nudge_y = 0) +
+  guides(alpha = "none", size = 'none') +
+  xlab(NULL) + ylab(NULL) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p
+
+# 
+# pdf(paste(path.figures, 'go_categories.pdf', sep = ''), width = 8, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
 ```
 

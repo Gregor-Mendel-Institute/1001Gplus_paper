@@ -1,6 +1,6 @@
 ---
 title: "Visualisation of Lisa's SNP PI diversity"
-output: html_notebook
+output: null_document
 ---
 
 # Setup

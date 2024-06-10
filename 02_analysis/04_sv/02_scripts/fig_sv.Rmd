@@ -4,18 +4,35 @@ output: null_document
 ---
 
 # Setup
-```{r, message=FALSE}
-library(cultevo)  #hammingdists
-library(ggplot2)
-library(ggtree)
-# library('ggmsa')
-library(gridExtra)
-library(egg)
+
+## My Libs
+```{r}
 
 path.base = '../../../'
-path.work = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/svs/', sep = '')
+
+path.pannagram = paste(path.base, '../pannagram/', sep = '')
+
+source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
+source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
+source(paste(path.pannagram, 'utils/utils.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/orfplot.R', sep = ''))
+```
+
+# Libs and paths
+```{r, message=FALSE}
+# library(cultevo)  #hammingdists
+library(ggplot2)
+# library(ggtree)
+# library('ggmsa')
+library(gridExtra)
+# library(egg)
+
+path.base = '../../../'
+path.work = paste(path.base, '01_data/04_annotation/02_pannagram/svs/', sep = '')
 path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
-path.genes = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes/', sep = '')
+path.genes = paste(path.base, '01_data/04_annotation/02_pannagram/genes/', sep = '')
 path.data.snps = paste(path.base, '02_analysis/06_snps/01_data/', sep = '')
 
 # path.work = '/Volumes/Samsung_T5/vienn/work_sv/'
@@ -29,13 +46,6 @@ file.sv.all = 'sv_all_events.rds'
 ```
 
 
-## Functions
-```{r}
-pokaz <- function(...) {
-  arguments <- paste(..., sep = " ")
-  message(arguments)
-}
-```
 
 # Reading
 ```{r}
@@ -65,29 +75,6 @@ sv.pos.end = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), s
 ```
 
 
-```{r}
-id.chr4 = which(sv.all$chr == 4)
-sv.pos.beg4 = sv.pos.beg[id.chr4,]
-sv.pos.end4 = sv.pos.end[id.chr4,]
-sv.all4 = sv.all[id.chr4,]
-
-
-p1 = min(which(sv.pos.beg4[,1] > 17486218))
-p2 = max(which(sv.pos.beg4[,1] < 17486482))
-
-sv.all4[p1:p2,]
-
-cbind(cbind(sv.pos.beg4[p1:p2,1:4], sv.pos.end4[p1:p2,1]), sv.all[id.chr4[p1:p2],])
-
-
-
-s = seqinr::read.fasta('/Volumes/Samsung_T5/vienn/work_browser/pangenome.fasta')
-
-
-```
-
-
-
 ## Stat
 ```{r}
 pokaz('Number of all SVs', nrow(sv.all))
@@ -95,7 +82,7 @@ pokaz('Number of SVs len >= 15', sum(sv.all$len >= 15))
 pokaz('me-se', paste0(c(table(sv.all$single[sv.all$len >= 15])), collapse = ' '))
 ```
 
-### Additional me-SV categories
+### TODO: Additional me-SV categories
 ```{r}
 
 
@@ -152,10 +139,10 @@ p
 
 p = p + theme(plot.margin = unit(c(-1, -1, -1, -1), "cm"))
 
-
-pdf(paste(path.figures, 'sv_pie_chart.pdf', sep = ''), width = 4.5, height = 4)
-print(p)     # Plot 1 --> in the first page of PDF
-dev.off()
+# 
+# pdf(paste(path.figures, 'sv_pie_chart.pdf', sep = ''), width = 4.5, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
   
   
 ```
@@ -180,6 +167,15 @@ n.portion = 5
 res1 = lm(accession ~ pangenome, data = df[1:round(nrow(df)/n.portion),])
 res2 = lm(accession ~ pangenome, data = df[nrow(df) - 1:round(nrow(df)/n.portion),])
 
+if((i.chr == 2) | (i.chr == 4)){
+  s.slopes = round(res2$coefficients[2], 2)
+  res1 = NULL
+} else {
+  s.slopes = paste(round(res1$coefficients[2], 2),
+                 round(res2$coefficients[2], 2), sep = ', ')
+}
+
+
 p <- ggplot(df, aes(pangenome, accession)) + 
     annotate(geom = "rect",ymin = cep.pos.chr$start2, ymax = cep.pos.chr$stop2, xmin = -Inf, xmax = Inf,
            fill = '#9AC5C7', alpha = 0.2) +
@@ -189,12 +185,15 @@ p <- ggplot(df, aes(pangenome, accession)) +
            fill = '#176B87', alpha = 0.5) +
   geom_point(size = 0.1) +
   # geom_line(data = df[c(1, nrow(df)),], aes(pangenome, accession), color = 'red') + 
-  geom_abline(intercept = res1$coefficients[1], slope = res1$coefficients[2], color = '#594A4E', alpha = 0.4, size = 2.5) +
-  geom_abline(intercept = res2$coefficients[1], slope = res2$coefficients[2], color = '#594A4E', alpha = 0.4, size = 2.5) +
+  geom_abline(intercept = res1$coefficients[1], slope = res1$coefficients[2], 
+              color = '#594A4E', alpha = 0.4, size = 2.5) +
+  geom_abline(intercept = res2$coefficients[1], slope = res2$coefficients[2], 
+              color = '#594A4E', alpha = 0.4, size = 2.5) +
   theme_minimal()+ theme(aspect.ratio=df[nrow(df),2]/df[nrow(df),1]) + 
   # ggtitle(paste('Chromosome', i.chr)) + 
   annotate("text", x = min(df$pangenome), y = max(df$accession), 
-             label = paste('Chromosome ', i.chr, '; Slope ', round(df[nrow(df),2]/df[nrow(df),1],2), sep = ''), 
+             label = paste('Chromosome ', i.chr, 
+                           ', Slopes: ', s.slopes, sep = ''), 
            hjust = 0, vjust = 0.8) +
   xlab('Pangenome coordinate')
 
@@ -207,14 +206,24 @@ if(i.acc != 1){
 p
 
 
-pdf(paste(path.figures, 'sv_coord_corresp_chr_',i.chr,'_acc_',colnames(sv.pos.beg)[i.acc],'.pdf', sep = ''), 
+# PDF
+pdf(paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+          '_acc_',colnames(sv.pos.beg)[i.acc],'.pdf', sep = ''), 
     width = 5, height = 3.75)
 print(p)     # Plot 1 --> in the first page of PDF
 dev.off()
 
 
-saveRDS(p, paste(path.figures, 'sv_coord_corresp_chr_',i.chr,'_acc_',colnames(sv.pos.beg)[i.acc], '.rds', sep = ''), 
-        compress = F)
+# PNG
+png(filename = paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+                     '_acc_',colnames(sv.pos.beg)[i.acc],'.png', sep = ''), 
+    width = 5, height = 3.5, res = 300, units = 'in')
+print(p)
+dev.off()
+
+# saveRDS(p, paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+#                  '_acc_', colnames(sv.pos.beg)[i.acc], '.rds', sep = ''), 
+#         compress = F)
 
 p.corresp = p
 
@@ -674,7 +683,7 @@ g = ggplot(sv.se[sv.se$len > 100,], aes(x = te, y = len, fill = te)) +
                                'contains complete', 'contains fragment')) +
   
   xlab('TE content') + ylab('Length, log10') +
-  scale_y_log10() + 
+  scale_y_log10() +
   geom_jitter(width = 0.2, size = 1, alpha = 0.05,stroke = 0) +
   theme_minimal() +
   guides(fill = FALSE) + theme(legend.position = "none") +
