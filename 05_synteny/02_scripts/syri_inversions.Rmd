@@ -1,0 +1,112 @@
+---
+title: "Indel analysis"
+output: null_document
+---
+
+# Setup
+```{r}
+library(rhdf5)
+library(ggplot2)
+
+path.msa = '../../../01_data/02_alignment/'
+
+path.msa = '/Volumes/Samsung_T5/vienn/alignment/new/consensus/'
+
+
+path.syri = '../../../01_data/07_syri/'
+
+accessions <- list.dirs(path = path.syri, full.names = F, recursive = F)
+
+
+```
+
+
+```{r}
+
+s.aln = 'comb_'
+s.aln = 'res_'
+s.aln = 'msa_'
+
+
+ref.acc = '0'
+# ref.acc = '10024'
+
+i.acc = 3
+acc = accessions[i.acc]
+
+file.inv = paste(path.syri, '/', acc, '/', 'TAIR10_', acc, '.invOut.txt', sep = '')
+lines.inv <- readLines(file.inv)
+lines.inv <- grep("^#", lines.inv, value = TRUE)
+
+df.inv <- read.table(text = lines.inv, sep = "\t", 
+                 col.names = c("tmp", "chr1", "beg1", "end1", "strand", "chr2", "beg2", "end2"),
+                 comment.char = '?')
+
+
+i.chr = 1
+df.inv.chr = df.inv[df.inv$chr1 == paste('Chr', i.chr, sep = ''),]
+
+file.msa = paste(path.msa, s.aln, i.chr, '_', i.chr, '_ref_',ref.acc,'.h5', sep = '')
+
+v.ref = h5read(file.msa, paste('accs/', '0', sep = ''))
+v = h5read(file.msa, paste('accs/', acc, sep = ''))
+
+pos.inv = rep(0, max(c(abs(v[!is.na(v)]),  df.inv.chr$end1) ) )
+pos.inv[abs(v[!is.na(v)])] = 1
+pos.inv[abs(v[!is.na(v) & (v < 0)])] = -1
+
+n.inv = list()
+for(irow in 1:nrow(df.inv.chr)){
+  idx = df.inv.chr$beg2[irow]:df.inv.chr$end2[irow]
+  n.inv[[irow]] = c(table(pos.inv[idx]))
+}
+n.inv
+
+```
+
+## Visualise
+```{r}
+
+
+x = readRDS(paste('/Volumes/Samsung_T5/vienn/alignment/new/alignments_0/',acc,'_',i.chr,'_',i.chr,'_full.rds', sep = ''))
+
+# s1 = seq2nt(readFastaMy(paste('/Volumes/Samsung_T5/vienn/pb_chromosomes/',acc,'_chr',i.chr,'.fasta', sep = '')))
+# s2 = seq2nt(readFastaMy(paste('/Volumes/Samsung_T5/vienn/pb_chromosomes/0_chr',i.chr,'.fasta', sep = '')))
+
+
+i.inv = 2
+beg1 = df.inv.chr$beg2[i.inv]
+end1 = df.inv.chr$end2[i.inv]
+beg2 = df.inv.chr$beg1[i.inv]
+end2 = df.inv.chr$end1[i.inv]
+
+p = dotplot(s1[beg1:end1], s2[beg2:end2], 15, 12)
+p
+
+
+p = dotplot(s1[(beg1-1000):(end1+1000)], s2[(beg2-1000):(end2+1000)], 15, 12)
+p
+
+idx1 = max(which(x$V2 <= beg1)) - 3
+idx2 = min(which(x$V2 >= end1)) + 1
+
+plotSynteny(x[idx1:(idx2),], vlines = c(beg1, end1), hlines = c(beg2,end2))
+
+
+
+```
+
+
+
+```{r}
+
+v = h5read(file.msa, paste('accs/', acc, sep = ''))
+
+which(v == end1)
+
+
+
+```
+
+
+

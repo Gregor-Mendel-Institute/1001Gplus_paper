@@ -1,0 +1,95 @@
+---
+title: "Common stat about accessions"
+# output: html_notebook
+output: null_document
+---
+
+# Setup
+```{r}
+library(ggplot2)
+library(rnaturalearth)
+library("ggrepel") 
+library('rcartocolor')
+
+path.work = '../01_data/'
+path.figures = '../03_figures/'
+
+file.traits = 'pb27_names.txt'
+file.geoloci = '1001genomes_loc.txt'
+```
+
+
+# Read names and locations
+```{r}
+
+loc.all = read.table(paste(path.work, file.geoloci, sep = ''), stringsAsFactors = F, header = T)
+rownames(loc.all) = loc.all$id
+
+acc.27 = read.table(paste(path.work, file.traits, sep = ''), stringsAsFactors = F, header = T, sep = "\t")
+acc.27$latitude = loc.all[as.character(acc.27$Identifier), 'latitude']
+acc.27$longitude = loc.all[as.character(acc.27$Identifier), 'longitude']
+
+# acc.27 = acc.27[!is.na(acc.27$latitude),]
+
+arab_df = data.frame(x = acc.27$longitude, y = acc.27$latitude, name = acc.27$Identifier, admix = acc.27$Admixture.Group)  
+
+arab_df = arab_df[!is.na(arab_df$x),]
+
+```
+
+
+# Plot samples on the map
+```{r}
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+xmin <- min(arab_df$x)
+xmax <- max(arab_df$x)
+ymin <- min(arab_df$y)
+ymax <- max(arab_df$y)
+
+
+my_colors <- c("#D88A32", "#6069AC", "#6FBAA4", "#ABCB67", "#BB62A9","#3E776C", "#D2A63E",
+"#4A88BF", "#70509A", "#DD6C60", "#BC458B","#A6A99A","#7E6363")
+
+p <- ggplot() +
+  geom_sf(data = world, color = 'grey') +
+  xlim(xmin, xmax)+ ylim(ymin, ymax) +
+  geom_point(data = arab_df, aes(x = x, y = y, color=admix), size = 1) +
+  theme_minimal() + 
+  geom_text_repel(data = arab_df, aes(x = x, 
+                      y = y, 
+                      label = name, color=admix), 
+                  fontface=2, show.legend = FALSE) +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom",    # Position legend at the bottom
+        legend.box = "horizontal")  +   # Arrange legend items horizontally
+   # scale_color_carto_d(name = "Admixture Group:", palette = "Vivid") +
+    scale_color_manual(name = "Admixture Group:", values = my_colors) +
+guides(color = guide_legend(nrow = 3, title.position = "top")) 
+p 
+
+
+pdf(paste(path.figures, 'pb27_map.pdf', sep = ''), width = 8, height = 3.5)
+print(p)  
+dev.off()
+
+pdf(paste(path.figures, 'pb27_map.pdf', sep = ''), width = 11, height = 6)
+print(p)  
+dev.off()
+
+```
+# Phylogenetic analysis
+## SNPs tree
+```{r}
+
+```
+
+# Tanglegrams
+```{r}
+
+```
+
+
+

@@ -1,0 +1,72 @@
+# Author: Sebastian Vorbrugg
+# Email: sebastian.vorbrugg@tuebingen.mpg.de
+# Date: 16.01.24
+# Description: Gfastats
+# GitHub: https://github.com/Gregor-Mendel-Institute/1001Gplus_paper
+
+# Tools needed: gfastats, snakemake,
+# gfastats: https://github.com/MoinSebi/gfastats
+# snakemake
+# Input fold contains graphs (chrom-sep)
+
+
+configfile: "config.yaml"
+
+rule target:
+    input:
+        expand(config["base"] + "bootstrap/gfastats.bootstrap.txt", run = config["run"]),
+        expand(config["base"] + "core/{run}.gfastats.core.txt", run = config["run"]),
+        expand(config["base"] + "window/{run}.gfastats.window.300000.txt", run = config["run"]),
+        expand(config["base"] + "ps/{run}.gfastats.ps.txt", run = config["run"]),
+        expand(config["base"] + "stats/{run}.gfastats.stats.txt", run = config["run"]),
+
+
+# Calculate core and more 
+rule core:
+    input:
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
+    output:
+        config["base"] + "core/{run}.gfastats.core.txt"
+    shell:
+        "gfastats core -g {input} -o {output} --pansn '#'"
+
+# Calculate windows (300k was the best in previous runs)
+rule window:
+    input:
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
+    output:
+        config["base"] + "window/{run}.gfastats.window.300000.txt"
+    shell:
+        "gfastats window -g {input} -o {output} -s 300000"
+
+# 20x Bootstrap 
+# This must me merged
+rule bootstrap:
+    input:
+        config["total_graph"]
+    output:
+        config["base"] + "bootstrap/gfastats.bootstrap.txt"
+    shell:
+        "gfastats bootstrap -g {input} -o {output} --number 20 --pansn '#'"
+
+
+# Path based stuff 
+rule ps:
+    input:
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
+    output:
+        config["base"] + "ps/{run}.gfastats.ps.txt"
+    shell:
+        "gfastats ps -g {input} -o {output}"
+
+# Graph stats stuff 
+rule stats: 
+    input:
+        config["data"] + "{run}.fasta.gz.c325321.c2fac19.5c75112.smooth.final.gfa"
+    output:
+        config["base"] + "stats/{run}.gfastats.stats.txt"
+    shell:
+        "gfastats stats -g {input} -o {output}"
+
+
+

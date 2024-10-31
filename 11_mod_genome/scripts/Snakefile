@@ -1,0 +1,158 @@
+# Author: Sebastian Vorbrugg
+# Email: sebastian.vorbrugg@tuebingen.mpg.de
+# Date: 16.01.24
+# Description: Modify 22001 accession to be in pan-genomic order
+# GitHub: https://github.com/Gregor-Mendel-Institute/1001Gplus_paper
+
+# Tools needed: minimap2, fpa and seqkit
+# Minimap2: 2.17-r954-dirty
+# Seqkit: v0.11.0
+# fpa: 0.5 Krabby
+# Snakemake: 5.5.3
+
+# Input fold contains all genomes of all accessions
+
+# Config with all the metadata
+configfile: "config.yaml"
+
+
+rule target:
+    input:
+        expand(config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta"),
+        expand(config["base"] + "minidot/22001.{comp}.after.eps", comp = config["comp"]),
+        expand(config["base"] + "minidot/22001.{comp}.before.eps", comp = config["comp"]),
+
+
+
+# For each chromosome, extract chromosome 3 and 5
+rule extratct_chr:
+    input:
+        config["data"] + "{acc}.scaffolds_corrected.v2.1.fasta"
+    output:
+        config["base"] + "chr{chr}/genomes/{acc}.scaffolds_corrected.v2.1.chr{chr}.fasta"
+    shell:
+        "seqkit grep -n -r -p 'Chr{wildcards.chr}' {input} > {output}"
+
+
+# Do the same with genome 22001
+rule extratct_chr_22001:
+    input:
+        config["data"] + "22001.scaffolds_corrected.v2.1.fasta"
+    output:
+        config["base"] + "chr{chr}/genomes2/22001.scaffolds_corrected.v2.1.chr{chr}.fasta"
+    shell:
+        "seqkit grep -n -r -p 'Chr{wildcards.chr}' {input} > {output}"
+
+
+
+# Map the all combinations of 22001 - XXXaccesion
+rule minimap2:
+    input:
+        query = config["base"] + "chr{chr}/genomes/{acc}.scaffolds_corrected.v2.1.chr{chr}.fasta",
+        ref = config["base"] + "chr{chr}/genomes2/22001.scaffolds_corrected.v2.1.chr{chr}.fasta"
+    output:
+        config["base"] + "chr{chr}/paf/{acc}.scaffolds_corrected.v2.1.chr{chr}.paf"
+    shell:
+        "minimap2 -x asm5 {input.query} {input.ref} > {output}"
+
+
+# Drop alignment smaller then 50000 kbp
+rule fpadrop:
+    input:
+        config["base"] + "chr{chr}/paf/{acc}.scaffolds_corrected.v2.1.chr{chr}.paf"
+    output:
+        config["base"] + "chr{chr}/paf50k/{acc}.scaffolds_corrected.v2.1.chr{chr}.50k.paf"
+    shell:
+        "cat {input} | fpa drop -l 50000 > {output}"
+
+# Concatenate all results into one file
+rule cat:
+    input:
+        expand(config["base"] + "chr{{chr}}/paf50k/{acc}.scaffolds_corrected.v2.1.chr{{chr}}.50k.paf", acc = config["acc"])
+    output:
+        config["base"] + "chr{chr}/mm/{chr}.scaffolds_corrected.v2.1.chr{chr}.50k.paf"
+    shell:
+        "cat {input} > {output}"
+
+# Create a bed from a paf
+rule make_bed:
+    input:
+        config["base"] + "chr{chr}/mm/{chr}.scaffolds_corrected.v2.1.chr{chr}.50k.paf"
+    output:
+        config["base"] + "chr{chr}/mm/{chr}.scaffolds_corrected.v2.1.chr{chr}.50k.bed"
+    run:
+        if {wildcards.chr} == {'3'}:
+            print("hit")
+            shell("./make_bed.py -p {input}  --min > {output}")
+        elif {wildcards.chr} == {'5'}:
+            shell("./make_bed.py -p {input} --max > {output}")
+
+# Merge all chromosomes together
+rule merge:
+    input:
+        expand(config["base"] + "chr{chr}/mm/{chr}.scaffolds_corrected.v2.1.chr{chr}.50k.bed", chr = config["chr"])
+    output:
+        config["base"] + "final_bed/merged_mm.bed"
+    shell:
+        "cat {input} > {output}"
+
+# Remove and add these regions - we know that they are reverse complements
+rule remove_add:
+    input:
+        bed =  config["base"] + "final_bed/merged_mm.bed",
+        genome = config["data"] + "22001.scaffolds_corrected.v2.1.fasta"
+    output:
+        config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta"
+    shell:
+        "./remove_and_add.py -f {input.genome} -b {input.bed} -o {output}"
+
+
+# Align with random other genome (pre modification)
+rule minidot_paf:
+    input:
+        ref = config["data"] + "22001.scaffolds_corrected.v2.1.fasta",
+        query = config["data"] + "{comp}.scaffolds_corrected.v2.1.fasta"
+    output:
+        config["base"] + "minidot/22001.{comp}.before.paf"
+    shell:
+        "minimap2 -x asm5 {input.ref} {input.query} |  fpa drop -l 50000 - > {output}"
+
+
+# Dotplot (pre modification)
+rule minidot:
+    input:
+        config["base"] + "minidot/22001.{comp}.before.paf"
+    output:
+        config["base"] + "minidot/22001.{comp}.before.eps"
+    shell:
+        "~/serverbin/miniasm/minidot {input} > {output}"
+
+# Align with random other genomes (after modification)
+rule minidot_paf_after:
+    input:
+        ref = config["base"] + "final_genome/22001f.scaffolds_corrected.v2.1.fasta",
+        query = config["data"] + "{comp}.scaffolds_corrected.v2.1.fasta"
+    output:
+        config["base"] + "minidot/22001.{comp}.after.paf"
+    shell:
+        "minimap2 -x asm5 {input.ref} {input.query} |  fpa drop -l 50000 - > {output}"
+
+# Dotplot (after modification)
+rule minidot_after:
+    input:
+        config["base"] + "minidot/22001.{comp}.after.paf"
+    output:
+        config["base"] + "minidot/22001.{comp}.after.eps"
+    shell:
+        "~/serverbin/miniasm/minidot {input} > {output}"
+
+
+# For the nice dotplot run: https://dgenies.toulouse.inra.fr/run --> REF 22001 QUERY
+
+
+
+
+
+
+
+

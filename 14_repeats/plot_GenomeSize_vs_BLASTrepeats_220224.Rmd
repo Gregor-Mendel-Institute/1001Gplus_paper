@@ -1,0 +1,355 @@
+---
+title: "plot_GenomeSize_vs_BLASTrepeats"
+output: html_document
+date: '2023-08-10'
+---
+
+
+# BLAST-based repeats
+
+```{r}
+
+library(broom)
+library(ggplot2)
+library(ggpubr)
+
+
+# Define variables
+workdir <- '/Volumes/abt6_projects8/1001g_plus_scaffolding/code/GitHub_1001gPLUS_FERNANDO/'
+
+# Load accession names from universal list
+accsALL <- read.table(paste(workdir, './names_ALL_PCRfree.txt', sep = ''))
+accsALL <- accsALL$V1
+accsALL
+
+# Create OUTPUT directory for ALL plots
+dir.create(paste(workdir, '/4_plots', sep = ''), showWarnings = FALSE)
+
+## Create OUTPUT directory for ALL repeat files
+dir.create(paste(workdir, '5_output_repeats', sep = ''), showWarnings = FALSE)
+
+#Create empty data frame
+BLAST_results <- data.frame(Accession=NA, Centromeres=NA, rDNA_45S=NA, rDNA_5S=NA, Kmer_coverage=NA, Genome_size=NA)
+
+# Read CEN, 45S and 5S repeats
+for(i in 1:length(accsALL)){
+  BLAST_results[i,] <- read.table(paste0('./output_blast/results/', accsALL[i], '.f_ALL.blastn.REPEATS.txt'))
+}
+
+# Repeats total
+BLAST_results$Repeats_total <- BLAST_results$Centromeres + BLAST_results$rDNA_45S + BLAST_results$rDNA_5S
+
+BLAST_results$nonRepeats <- BLAST_results$Genome_size - BLAST_results$Repeats_total
+
+# Clear off suffix
+BLAST_results$Accession <- sub(".f_ALL", "", BLAST_results$Accession)
+
+BLAST_results
+```
+
+
+# Genome size vs ALL repeats
+```{r}
+
+## Export summary GENOME SIZE and REPEATS
+write.table(BLAST_results, paste0('./5_output_repeats/SuppTable.genome_size_and_repeats.txt'), row.names = FALSE, quote = FALSE, sep = "\t")
+
+model_repeats <- summary(lm(Genome_size ~ Repeats_total, BLAST_results))
+model_repeats$r.squared
+#[1] 0.898707
+
+
+# Generate PLOT
+plot_1 <- ggplot(BLAST_results, aes(x=Genome_size/1000000, y=Repeats_total/1000000)) +
+  geom_point() + 
+  geom_text(label=BLAST_results$Accession) + 
+  theme_minimal() +
+  xlab("Genome size (Mb)") + ylab("Centromeres + 45S rDNAs + 5S rDNAs  (Mb)") +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm', formula= y~x) +
+  stat_cor(aes(label=..rr.label..), label.x=165, label.y=36, size=4.2)
+
+print(plot_1)
+
+# PDF
+pdf(paste0(workdir, '/4_plots/SuppFig.GenomeSize_vs_Repeats.pdf'), width = 8, height = 6)
+plot_1
+dev.off()
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/SuppFig.GenomeSize_vs_Repeats.png'), width = 200, height = 120, units='mm', res = 300)
+png(paste0(workdir, '/4_plots/SuppFig.GenomeSize_vs_Repeats.png'), width = 160, height = 120, units='mm', res = 300)
+plot_1
+dev.off()
+
+# Correlation stats
+summary(lm(BLAST_results$Genome_size~ BLAST_results$Repeats_total))
+# Adjusted R-squared:  0.8987
+# p-value: < 2.2e-16
+
+print(plot_1)
+
+```
+
+```{r}
+
+model_repeats <- summary(lm(Genome_size ~ Centromeres + rDNA_45S + rDNA_5S, BLAST_results))
+model_repeats$r.squared
+#[1] 0.9192773
+
+```
+
+```{r}
+# Generate PLOT
+plot_2 <- ggplot(BLAST_results, aes(x=nonRepeats/1000000)) +
+  geom_histogram(colour="black", fill="grey") + 
+  theme_minimal() +
+  xlab("non-repeats (Mb)") 
+
+print(plot_2)
+
+
+```
+Re-format data frame for ggplot
+
+```{r}
+# Re-arrange table for ggploting
+BLAST_CEN <- data.frame(Accession = BLAST_results$Accession, Genome_size = BLAST_results$Genome_size, Repeat = BLAST_results$Centromeres, Type = "Centromere")
+BLAST_45S <- data.frame(Accession = BLAST_results$Accession, Genome_size = BLAST_results$Genome_size, Repeat = BLAST_results$rDNA_45S, Type = "45S rDNA")
+BLAST_5S <- data.frame(Accession = BLAST_results$Accession, Genome_size = BLAST_results$Genome_size, Repeat = BLAST_results$rDNA_5S, Type = "5S rDNA")
+
+BLAST_for_plot <- rbind(BLAST_CEN, BLAST_45S, BLAST_5S)
+  
+## Order data set by genome size level 
+#BLAST_for_plot$Accession <- factor(BLAST_for_plot$Accession , levels=factor(mayor2[,1]) )   
+
+# Re-order repeats within each column
+BLAST_for_plot$Type <- factor(BLAST_for_plot$Type, levels=c("Centromere", "45S rDNA","5S rDNA"), exclude=NULL) 
+# "Average" color: #980043    
+   
+# Linear models
+model_CEN <- summary(lm(Genome_size ~ Centromeres, BLAST_results))
+model_45S <- summary(lm(Genome_size ~ rDNA_45S, BLAST_results))
+model_5S <- summary(lm(Genome_size ~  rDNA_5S, BLAST_results))
+
+model_CEN$r.squared
+#[1] 0.6528163
+model_45S$r.squared
+#[1] 0.4491446
+model_5S$r.squared
+#[1] 0.08953344
+
+# 1001g+ colours:       '#67001f', '#ce1256','#c994c7'
+# 100 PCRfree colours:  '#252525', '#67001f', '#b30000'
+
+plot_3 <- ggplot(BLAST_for_plot, aes(x=Genome_size/1000000, y=Repeat/1000000, col=Type)) +
+  geom_point() + 
+  #geom_text(label=BLAST_for_plot$Accession) + 
+  scale_x_continuous(limits = c(132, 173), breaks = seq(130, 170, 10), labels = abs(seq(130, 170, 10))) +
+  scale_color_manual("Repeat type", values = c('#67001f', '#ce1256', '#c994c7'),  na.value="#d4b9da" ) +
+  theme_minimal() +
+  theme(legend.position = "bottom", text = element_text(size=18), axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1, size=15), axis.text.x = element_text(size=15)) +
+  xlab("Genome size (Mb)") + ylab("Repeat length (Mb)") + ggtitle(label = "") +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm', formula= y~x) + 
+  stat_cor(aes(label=..rr.label..), label.x=169, label.y=c(26, 14.5, 4), size=4.2)
+
+plot_3
+
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/Figure.GenomeSize_vs_ALLrepeats.png'), width = 200, height = 120, units='mm', res = 300)
+png(paste0(workdir,  '4_plots/Figure.GenomeSize_vs_ALLrepeats.png'), width = 200, height = 120, units='mm', res = 300)
+plot_3
+dev.off()
+
+plot_3
+  
+```
+# Removing outlier accession (Ws-2; 6981) from the regression 
+
+```{r}
+# Remove outlier accession
+BLAST_results2 <- BLAST_results[-which(BLAST_results$Accession == 6981), ]
+BLAST_for_plot2 <- BLAST_for_plot[-which(BLAST_for_plot$Accession == 6981), ]
+
+
+# Linear models
+model_CEN_2 <- summary(lm(Genome_size ~ Centromeres, BLAST_results2))
+model_45S_2 <- summary(lm(Genome_size ~ rDNA_45S, BLAST_results2))
+model_5S_2 <- summary(lm(Genome_size ~  rDNA_5S, BLAST_results2))
+
+model_CEN_2$r.squared
+#[1] 0.52923
+model_45S_2$r.squared
+#[1] 0.5248502
+model_5S_2$r.squared
+#[1] 0.0881257
+
+# 1001g+ colours:       '#67001f', '#ce1256','#c994c7'
+# 100 PCRfree colours:  '#252525', '#67001f', '#b30000'
+
+plot_4 <- ggplot(BLAST_for_plot2, aes(x=Genome_size/1000000, y=Repeat/1000000, col=Type)) +
+  geom_point() + 
+  #geom_text(label=BLAST_for_plot2$Accession) + 
+  scale_x_continuous(limits = c(132, 173), breaks = seq(130, 170, 10), labels = abs(seq(130, 170, 10))) +
+  scale_color_manual("Repeat type", values = c('#67001f', '#ce1256','#c994c7'),  na.value="#d4b9da" ) +
+  theme_minimal() +
+  theme(legend.position = "bottom", text = element_text(size=18), axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1, size=15), axis.text.x = element_text(size=15)) +
+  xlab("Genome size (Mb)") + ylab("Repeat length (Mb)") + ggtitle(label = "") +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm', formula= y~x) + 
+  stat_cor(aes(label=..rr.label..), label.x=155.5, label.y=c(19, 12, 3.5), size=4.2)
+
+plot_4
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/Figure.GenomeSize_vs_ALLrepeats.without6981.png'), width = 200, height = 120, units='mm', res = 300)
+png(paste0(workdir, '/4_plots/Figure.GenomeSize_vs_ALLrepeats.without6981.png'), width = 200, height = 120, units='mm', res = 300)
+plot_4
+dev.off()
+
+
+plot_4
+  
+```
+
+```{r}
+# Now the opposite: keep only the information for outlier accession
+BLAST_for_plot_6981 <- BLAST_for_plot[which(BLAST_for_plot$Accession == 6981), ]
+
+# 
+plot_5 <- plot_4 + 
+  geom_point(data = BLAST_for_plot_6981, aes(x = Genome_size/1000000, y = Repeat/1000000, color = Type, fill= Type), size=3, shape = 17) +
+  geom_text(data = BLAST_for_plot_6981, aes(label = Accession), vjust = 0.2, hjust = -0.5, size = 4.2) # Adding label only to the single point
+
+plot_5
+
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/Figure.GenomeSize_vs_ALLrepeats.extra6981.png'), width = 200, height = 120, units='mm', res = 300)
+png(paste0(workdir, '/4_plots/Figure.GenomeSize_vs_ALLrepeats.extra6981.png'), width = 200, height = 120, units='mm', res = 300)
+plot_5
+dev.off()
+
+plot_5
+
+
+```
+# Now, only for the 27 accessions in the 1001g+ study
+
+```{r}
+
+genomes27 <- c("1741",  "6024",  "6069",  "6124",  "6244",  "6909",  "6966",  "8236",  "9075",  "9537",  "9543",  "9638",  "9728",  "9764",  "9888", "9905",  "9981",  "10002", "10015", "10024", "22001", "22002", "22003", "22004", "22005", "22006", "22007")
+
+BLAST_results_27 <- BLAST_results[ BLAST_results$Accession %in% genomes27, ]
+
+BLAST_for_plot_27 <- BLAST_for_plot[ BLAST_for_plot$Accession %in% genomes27, ]
+
+# Linear models
+model_CEN <- summary(lm(Genome_size ~ Centromeres, BLAST_results_27))
+model_45S <- summary(lm(Genome_size ~ rDNA_45S, BLAST_results_27))
+model_5S <- summary(lm(Genome_size ~  rDNA_5S, BLAST_results_27))
+
+model_CEN$r.squared
+#[1] 0.502086
+model_45S$r.squared
+#[1] 0.6767771
+model_5S$r.squared
+#[1] 0.08351731
+
+
+plot_6 <- ggplot(BLAST_for_plot_27, aes(x=Genome_size/1000000, y=Repeat/1000000, col=Type)) +
+  geom_point() + 
+  scale_x_continuous(limits = c(131.5, 163.5), breaks = seq(130, 160, 10), labels = abs(seq(130, 160, 10))) +
+  scale_color_manual("Repeat type", values = c('#67001f', '#ce1256', '#c994c7'),  na.value="#d4b9da" ) +
+  theme_minimal() +
+  theme(legend.position = "bottom", text = element_text(size=18), axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1, size=15), axis.text.x = element_text(size=15)) +
+  xlab("Genome size (Mb)") + ylab("Repeat length (Mb)") + ggtitle(label = "") +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm', formula= y~x) + 
+  stat_cor(aes(label=..rr.label..), label.x=156, label.y=c(18, 13, 3.5), size=4.2)
+
+plot_6
+
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/Figure.GenomeSize_vs_ALLrepeats.27accs.png'), width = 200, height = 120, units='mm', res = 300)
+png(paste0(workdir,  '4_plots/Figure.GenomeSize_vs_ALLrepeats.27accs.png'), width = 200, height = 120, units='mm', res = 300)
+plot_6
+dev.off()
+
+plot_6
+
+
+```
+
+
+Plot BLAST-based repeat lengths in the context of genome size
+
+```{r}
+# Re-arrange table for ggploting
+BLAST_results_27
+
+blast_CEN <- data.frame(Accession = BLAST_results_27$Accession, Length = BLAST_results_27$Centromeres, Type = "Centromere")
+blast_45S <- data.frame(Accession = BLAST_results_27$Accession, Length = BLAST_results_27$rDNA_45S, Type = "45S rDNA")
+blast_5S <- data.frame(Accession = BLAST_results_27$Accession, Length = BLAST_results_27$rDNA_5S, Type = "5S rDNA")
+
+blast_for_plot <- rbind(blast_CEN, blast_45S, blast_5S)
+
+# Order data set by genome size level from previous plot
+blast_for_plot$Accession <- factor(blast_for_plot$Accession , levels=factor(mayor2[,1]) )   
+
+# Re-order repeats within each column
+blast_for_plot$Type <- factor(blast_for_plot$Type, levels=c("45S rDNA","5S rDNA",  "Centromere"), exclude=NULL) 
+# "Average" color: #980043    
+      
+# Plot Proportion of Repeats in the Assembled scaffolds 
+plot_repeats_blast <- ggplot(blast_for_plot, aes(fill=Type, x=Length/1000000, y=Accession)) + 
+  geom_bar(position="stack", stat="identity", width = 0.85) +
+  scale_x_continuous(limits = c(0, 39), breaks = seq(0, 40, 20), labels = abs(seq(0, 40, 20))) +
+  scale_fill_manual("Annotation", values = c('#ce1256','#c994c7',  '#67001f'),  na.value="#d4b9da" ) +
+  theme_minimal() +
+  theme(legend.position = "none", text = element_text(size=18), axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1, size=15), axis.text.x = element_text(size=15)) +
+  ggtitle(label = "") +
+  ylab("Accession") + xlab("Cumulative length (Mb)") 
+
+print(plot_repeats_blast)
+
+# PDF
+#pdf(paste0('/Users/frabanal/Downloads/MainFig.Repeats_blast.pdf'), width = 3.2, height = 8)
+pdf(paste0(workdir, '/4_plots/MainFig.Repeats_blast.pdf'), width = 3.8, height = 8)
+plot_repeats_blast
+dev.off()
+
+# PNG
+#png(paste0('/Users/frabanal/Downloads/MainFig.Repeats_blast.png'), width = 100, height = 200, units='mm', res = 300)
+png(paste0(workdir, '/4_plots/MainFig.Repeats_blast.png'), width = 100, height = 200, units='mm', res = 300)
+plot_repeats_blast
+dev.off()
+
+print(plot_repeats_blast)
+
+
+
+
+```
+
+# Correlation between centromeres and rDNA
+
+```{r}
+
+# Linear models
+model_CEN_45S <- summary(lm(rDNA_45S ~ Centromeres, BLAST_results2))
+model_45S_5S <- summary(lm(rDNA_45S ~ rDNA_5S, BLAST_results2))
+model_CEN_5S <- summary(lm(Centromeres ~ rDNA_5S, BLAST_results2))
+
+model_CEN_45S$r.squared
+#[1] 0.03242124
+model_45S_5S$r.squared
+#[1] 0.0252363
+model_CEN_5S$r.squared
+#[1] 0.06050255
+
+
+```

@@ -1,0 +1,2048 @@
+---
+title: "Analysis of annotation groups and genes"
+output: null_document
+---
+
+# Setup
+```{r, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(beepr)
+
+s.version = 'v05'
+
+path.base = '../../../'
+path.genes = paste(path.base, '01_data/04_annotation/02_pannagram/genes_',s.version,'/', sep = '')
+path.expr = paste(path.base, '01_data/05_expression/', sep = '')
+
+
+path.tair10 = paste(path.base, '01_data/01_tair10/', sep = '')
+path.svs = paste(path.base, '01_data/04_annotation/02_pannagram/svs/', sep = '')
+file.pangen.genes = paste('genes_',s.version,'_pangen_all.gff', sep = '')
+
+path.figures  = paste(path.base, '02_analysis/03_annotation/03_figures/', sep = '')
+path.data  = paste(path.base, '02_analysis/03_annotation/01_data/', sep = '')
+# Previous figures:
+# path.figures  = '/Volumes/Samsung_T5/vienn/work_duplicated/figures/'
+
+te.cutoff = 0.5
+
+```
+
+## Function
+```{r}
+pokaz <- function(...) {
+  arguments <- paste(..., sep = " ")
+  message(arguments)
+}
+```
+
+## Colors
+```{r}
+library(khroma)  #colour
+
+col_rainbow = colour("discrete rainbow")
+col_generator = colour("iridescent")
+
+```
+
+
+# START
+## Read
+```{r}
+gff.all = read.table(paste(path.genes, file.pangen.genes, sep = ''), stringsAsFactors = F)
+
+# annotation group
+V10 <- sub("[.;].*", "", gff.all$V9)
+V10 <- gsub("ID=", "", V10)
+gff.all$group = V10
+
+# Tai10 liftoff
+gff.all$tair.only = 1 - grepl("^AT[1-5]Gr", gff.all$group) * 1
+
+beepr::beep()
+
+```
+
+
+
+### Remove duplications
+This procedure is the result of a bug
+```{r}
+
+gff.genes = gff.all[gff.all$V3 == 'gene',]
+gff.genes$order = which(gff.all$V3 == 'gene')
+
+ann.dup = unique(gff.genes$group[duplicated(gff.genes$group)])
+length(ann.dup)
+
+idx.delete = c()
+for(g.dup in ann.dup){
+  idx.tmp = which(gff.genes$group == g.dup)
+  if(length(idx.tmp) > 2) {
+    # message(paste(g.dup, length(idx.tmp)))
+  }
+  # d.tmp = gff.genes$V5[idx.tmp] - gff.genes$V4[idx.tmp]
+  d.tmp = nchar(gff.genes$V9[idx.tmp])
+  idx.delete = c(idx.delete, idx.tmp[d.tmp != max(d.tmp)])
+}
+
+if(length(idx.delete) > 0){
+  gff.all = gff.all[-gff.genes$order[idx.delete],]
+}
+
+gff.all$len = abs(gff.all$V4 - gff.all$V5) + 1
+
+#
+# write.table(gff.all[,1:9],
+#             paste(path.work, sub("\\.", "_cleaning01.", file.pangen), sep = ''),
+#             quote = F,
+#             col.names = F, row.names = F, sep = '\t')
+
+beepr::beep()
+
+```
+
+# Duplicated genes
+
+
+./blast_all_genes_on_acc.sh
+RScript get_similar_genes_in_accessions.R
+
+```{r}
+
+gff.all = gff.all[(gff.all$V3 == 'gene')|(gff.all$V3 == 'mRNA'),]
+
+# Duplicated genes
+# sim-gr
+gff.all$simgr = sapply(gff.all$V9, function(s) {
+  s = strsplit(s, 'simgr=')[[1]][2]
+  s = strsplit(s, ';')[[1]][1]
+return(s)
+})
+gff.all$simgr[is.na(gff.all$simgr)] = ''
+ann.sim.unique = unique(gff.all[,c('group', 'simgr')])
+sim.cnt = c(table(ann.sim.unique$simgr))
+sim.dup = setdiff(names(sim.cnt)[sim.cnt>1], '')
+gff.all$dup = (gff.all$simgr %in% sim.dup) * 1
+ann.gr.dup = unique(gff.all$group[gff.all$dup == 1])
+
+pokaz('Number of duplicated genes:', length(ann.gr.dup))
+
+
+# TE content in mRNA
+gff.all$te = sapply(gff.all$V9, function(s) {
+  s = strsplit(s, 'te.coverage=')[[1]][2]
+  s = strsplit(s, ';')[[1]][1]
+return(s)
+})
+gff.all$te[is.na(gff.all$te)] = 0
+gff.all$te = as.numeric(gff.all$te)
+
+
+beepr::beep()
+```
+
+
+
+# Prepare data: genes/mrna/new
+```{r}
+
+# ---------------------------------------------
+# Define mRNA
+gff.mrna = gff.all[gff.all$V3 == 'mRNA',]
+gff.mrna$acc = gsub(".*_(\\d+).*", "\\1", gff.mrna$V2)
+
+# ---------------------------------------------
+# Define genes
+gff.genes = gff.all[gff.all$V3 == 'gene',]
+gff.genes$have.tair = grepl('Name=', gff.genes$V9, fixed = TRUE) * 1
+gff.genes$not.detect = (!(gff.genes$group %in% gff.mrna$group)) * 1
+
+gff.genes$not.detect = (!(gff.genes$group %in% gff.mrna$group)) * 1
+gff.genes$chr = sapply(gff.genes$V1, function(s) strsplit(s, '_')[[1]][3])
+
+
+# ---------------------------------------------
+## Copy-number
+genes.cnv.init = readRDS(paste(path.genes, 'similar_cnv_genes_on_accessions_cum_rename.rds', sep = ''))
+genes.cnv = apply(genes.cnv.init, 1, max)
+genes.cnv.gr = sapply(names(genes.cnv), function(s) strsplit(s, '\\.')[[1]][1])
+genes.cnv.max = tapply(genes.cnv, genes.cnv.gr, max)
+
+gff.genes$cnv = (gff.genes$group %in% names(genes.cnv.max)[genes.cnv.max > 1])*1
+table(gff.genes$cnv, gff.genes$dup)
+
+# ---------------------------------------------
+# Define TE content
+
+te.gr = tapply(gff.mrna$te, gff.mrna$group, max)
+idx.tmp = which(gff.genes$group %in% names(te.gr))
+gff.genes$te[idx.tmp] = te.gr[gff.genes$group[idx.tmp]]
+
+gr.te = unique(gff.genes$group[gff.genes$te >= te.cutoff])
+
+# gff.genes$te[is.na(gff.genes$te)] = 0
+gff.genes$te = round(gff.genes$te * 10) / 10
+gff.genes$te = factor(gff.genes$te, levels = rev(sort(unique(gff.genes$te))))
+
+gff.genes$is.te = gff.genes$group %in% gr.te
+
+table(gff.genes$is.te, gff.genes$te)
+
+# ---------------------------------------------
+# Gene categories
+categories = c('new_genes', 'annogr_tair10', 'tair10_only')
+gff.genes$category = categories[gff.genes$have.tair +  gff.genes$tair.only + 1]
+gff.genes$dup = gff.genes$group %in% ann.gr.dup
+
+table(gff.genes$dup, gff.genes$category)
+
+# ---------------------------------------------
+# TAIR10 gene name
+
+tmp = sapply(gff.genes$V9, function(s) strsplit(s, 'Name=')[[1]][2])
+tmp = tmp[!is.na(tmp)]
+tmp = sapply(tmp, function(s) strsplit(s, ';')[[1]][1])
+
+n.comma = stringr::str_count(tmp, ",")
+
+pokaz('Numer of annogroups with > 1 tair10 genes', sum(n.comma > 0))
+
+tmp.dup = tmp[duplicated(tmp)]
+sum(tmp %in% tmp.dup)
+
+# ---------------------------------------------
+# Save the gff of new genes
+ann.new = gff.genes$group[gff.genes$have.tair == 0]
+gff.new = gff.all[gff.all$group %in% ann.new,]
+
+gff.new = gff.genes[gff.genes$group %in% ann.new,]
+
+
+# saveRDS(gff.genes, paste(path.figures, 'gff_genes.rds', sep = ''), compress = F)
+# write.table(gff.genes, paste(path.figures, 'gff_genes.txt', sep = ''), 
+#             quote = F, row.names = F, col.names = T, sep = '\t')
+
+beepr::beep()
+
+```
+
+
+
+# Diff between CNV and Duplication (simgr)
+```{r}
+table(gff.genes$cnv, gff.genes$dup)
+
+gff.tmp = gff.genes[(gff.genes$cnv == 1) & (gff.genes$dup == F),]
+table(gff.tmp$is.te)
+table(gff.tmp$category)
+
+gff.tmp = gff.genes[(gff.genes$cnv == 0) & (gff.genes$dup == T),]
+table(gff.tmp$is.te)
+table(gff.tmp$category)
+
+
+gff.tmp = gff.genes[(gff.genes$cnv == 1) & (gff.genes$dup == F),]
+head(gff.tmp)
+k = 1
+gff.tmp$group[k]
+genes.cnv.init[genes.cnv.gr == gff.tmp$group[k],]
+
+
+
+gff.tmp = gff.genes[(gff.genes$cnv == 0) & (gff.genes$sv < F),]
+
+
+
+```
+
+
+
+# Statisticks
+## Number of annitation groups
+```{r}
+
+pokaz('Number of all groups:', length(unique(gff.all$group)))
+pokaz('Number of annogroups:', length(unique(gff.all$group[gff.all$tair.only == 0])))
+pokaz('Number of TAIR10 liftoff:', length(unique(gff.all$group[gff.all$tair.only == 1])))
+pokaz('number of annogroups with TAIR10:', sum((gff.genes$have.tair == 1) & (gff.genes$tair.only == 0)))
+pokaz('number of new genes:', sum((gff.genes$have.tair == 0)))
+
+pokaz('Check: number of new genes:', length(ann.new))
+
+
+pokaz('Check: Number of genes:', nrow(gff.genes))
+
+pokaz('Number of all groups with TEs:', sum(gff.genes$group %in% gr.te))
+pokaz('Check: Number of all groups with TEs:', sum(gff.genes$is.te))
+pokaz('Check Number of all groups with TEs:', length(gr.te))
+pokaz('Number of new genes with TEs:', sum((gff.genes$group %in% gr.te) & (gff.genes$have.tair == 0)))
+
+
+
+
+```
+
+
+## Plot - duplicated distr
+```{r}
+# BY SIMILARITY GROUP
+df.tmp = as.data.frame(table(gff.genes$dup, gff.genes$category))
+g <- ggplot(df.tmp, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_col(position = "dodge") +
+  labs(x = "", y = "Count") +
+  scale_fill_manual(values = c("TRUE" = "#FF8551", "FALSE" = "#9BCDD2"),
+                    labels= c('unique', 'duplicated')) +
+  guides(fill = guide_legend(title = "")) +
+  scale_x_discrete(labels = function(x) stringr::str_to_sentence(gsub("_", " ", x))) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+pdf(paste(path.figures, 'gene_dup_all_simgr.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+## Plot - CN distr
+```{r}
+
+df.tmp = as.data.frame(table(gff.genes$cnv, gff.genes$category))
+g <- ggplot(df.tmp, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_col(position = "dodge") +
+  labs(x = "", y = "Count") +
+  scale_fill_manual(values = c("1" = "#FF8551", "0" = "#9BCDD2"),
+                    labels= c('unique', 'duplicated')) +
+  guides(fill = guide_legend(title = "")) +
+  scale_x_discrete(labels = function(x) stringr::str_to_sentence(gsub("_", " ", x))) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+pdf(paste(path.figures, 'gene_dup_all_cnv.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+## Plot - te
+```{r}
+
+g <- ggplot(gff.genes, aes(x = category, fill = is.te)) +
+  geom_bar(color = "black", alpha = 0.7, position = "dodge", width = 0.85) +
+  xlab(NULL) + ylab(NULL) +
+  viridis::scale_fill_viridis(discrete=TRUE, direction = -1, labels = c('Not TE', 'TE')) +
+  scale_x_discrete(labels = function(x) stringr::str_to_sentence(gsub("_", " ", x))) +
+  # geom_text(stat = 'count', aes(label = after_stat(count)), position = position_stack(vjust = 0.5)) +
+  geom_text(
+    stat = 'count',
+    aes(label = format(after_stat(count), big.mark = ",")),
+    position = position_dodge(width = 0.85),  # Adjust the width value as needed
+    vjust = -0.5,  # Adjust the vertical positioning of the labels
+    size = 2.5  # Adjust the size of the labels
+  ) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                          panel.grid.major.x = element_blank(),  
+                          panel.grid.minor.y = element_blank()) + labs(fill = NULL)  +
+  theme(legend.position = c(0.8, 0.69),
+        legend.background = element_rect(fill = "white", color = "grey20")) + ylim(0, 25200) +
+  theme(legend.key.size = unit(0.4,"cm"))
+
+g
+
+
+pdf(paste(path.figures, 'gene_category_te_stack.pdf', sep = ''), width = 3, height = 2.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+g <- ggplot(gff.genes, aes(x = category, fill = te)) +
+  geom_bar(color = "black", alpha = 0.7) +
+  labs(x = " ", y = "") +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  scale_x_discrete(labels = function(x) stringr::str_to_sentence(gsub("_", " ", x))) +
+  # geom_text(stat = 'count', aes(label = after_stat(count)), position = position_stack(vjust = 0.5)) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                          panel.grid.major.x = element_blank(),  
+                          panel.grid.minor.y = element_blank()) + labs(fill = "") 
+
+g
+
+
+pdf(paste(path.figures, 'gene_category_te_stack_01.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+g <- ggplot(gff.genes, aes(x = category, fill = is.te)) +
+  geom_bar(color = "black", alpha = 0.7, position = "fill") +
+  labs(x = " ", y = "") +
+  viridis::scale_fill_viridis(discrete=TRUE, direction = -1, labels = c('Not TE', 'TE')) +
+  scale_x_discrete(labels = function(x) stringr::str_to_sentence(gsub("_", " ", x))) +
+  geom_text(stat = 'count', aes(label = stat(count)), position = position_fill(vjust = 0.5)) +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                          panel.grid.major.x = element_blank(),  
+                          panel.grid.minor.y = element_blank()) + labs(fill = "") 
+
+g
+
+pdf(paste(path.figures, 'gene_category_te_fill.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+  
+
+```
+
+
+
+
+## Saturation curves
+```{r}
+
+```
+
+
+
+# Expression
+
+## tpm
+```{r}
+d.exp = read.table(paste(path.expr, 'TPMs.mRNAs_exons.bed', sep = ''), 
+                   stringsAsFactors = F, header = T, row.names = 1)
+
+idx.gene <- grep("^A", rownames(d.exp))
+
+pokaz('Number of genes:\t', nrow(gff.genes))
+pokaz('Check: number of genes:\t', length(idx.gene))
+
+g.exp = d.exp[idx.gene,]
+
+
+acc.cols <- sub(".*\\.(\\d+).*", "\\1", colnames(g.exp))
+acc.cols = setdiff(acc.cols, c('gene_freq', 'mRNA_freq'))
+accessions = sort(unique(acc.cols))
+
+df = c()
+for(acc in accessions){
+  df = cbind(df, rowSums(g.exp[,acc.cols == acc], na.rm = TRUE) )
+}
+colnames(df) = accessions
+df.new = df[gff.new$group,]
+
+df.new.present = df.new > 1
+table(rowSums(df.new.present))
+
+# Define expression
+gff.new$express = rowSums(df.new.present) != 0
+gff.new$express.f = rowSums(df.new.present) 
+
+which((gff.new$express.f == 0) & (gff.new$freq == 27))
+
+table(gff.new$express.f, gff.new$freq)
+
+```
+
+## cnt
+```{r}
+d.exp = read.table(paste(path.expr, 'counts.genes_and_SVs.bed', sep = ''), 
+                   stringsAsFactors = F, header = T, row.names = 1)
+
+# d.exp = read.table('/Volumes/Samsung_T5/vienn/work_expression/TPMs.mRNAs_exons.bed', 
+#                    stringsAsFactors = F, header = T, row.names = 1)
+
+idx.gene <- grep("^A", rownames(d.exp))
+
+pokaz('Number of genes:\t', nrow(gff.genes))
+pokaz('Check: number of genes:\t', length(idx.gene))
+
+g.exp = d.exp[idx.gene,]
+
+g.exp.good = g.exp[gff.genes$group[gff.genes$category == 'annogr_tair10'],]
+g.exp.good = g.exp.good[,sort(colnames(g.exp.good))]
+g.exp.good = g.exp.good[,colnames(g.exp.good) != 'gene_freq']
+
+
+
+
+
+```
+
+## Expression in new genes
+```{r}
+acc.cols <- sub(".*\\.(\\d+).*", "\\1", colnames(g.exp.good))
+accessions = sort(unique(acc.cols))
+
+
+df = c()
+for(acc in accessions){
+  df = cbind(df, rowSums(g.exp[,acc.cols == acc] > 2^4, na.rm = TRUE) / sum(acc.cols == acc))
+}
+colnames(df) = accessions
+
+df.new = df[gff.new$group,]
+df.new.present = df.new > 0.1
+
+gff.new$express = rowSums(df.new.present) != 0
+
+gff.new$express.f = rowSums(df.new.present) 
+
+
+
+
+
+
+```
+
+
+
+# Distributions along chromosomes
+## All
+```{r}
+
+
+idx = (gff.genes$have.tair  == 0) & (gff.genes$chr == 1)
+idx = (gff.genes$not.detect  == 1) & (gff.genes$chr == 1)
+idx = (gff.genes$chr == 1)
+
+genes.ag.tair = gff.genes$group[(gff.genes$have.tair  == 1) & (gff.genes$not.detect  == 0)]
+
+table(gff.genes$have.tair, gff.genes$not.detect)
+  
+g <- ggplot(gff.genes, aes(x=V4, fill = factor(have.tair, levels = c(1, 0)) )) + 
+  geom_histogram(bins = 50, color='grey20', alpha=1) +
+  theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        strip.text.y = element_text(angle = 0),
+        panel.grid.major.y = element_blank()) + 
+  # viridis::scale_fill_viridis(discrete=TRUE) +
+  scale_fill_manual(values = c("#FAF0D7", "#A76F6F"),
+                    labels = c("TAIR10", "New")) +
+  xlab('Pangenome coordinate') + 
+  ylab('Absolute amount') +
+  guides(fill=guide_legend(title="Genes"),)  +
+  theme(legend.position = c(0.89, 0.65),
+        legend.background = element_rect(fill = "white", color = "grey20"))
+
+g
+
+
+
+pdf(paste(path.figures, 'gene_chr_distr_all.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+
+
+## All whout TEs
+```{r}
+
+g <- ggplot(gff.genes[!(gff.genes$group %in% gr.te),], 
+            aes(x=V4, fill = factor(have.tair, levels = c(1, 0)) )) + 
+  geom_histogram(bins = 50,color='grey20', alpha=1) +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        strip.text.y = element_text(angle = 0),
+        panel.grid.major.y = element_blank()) + 
+  scale_fill_manual(values = c("#FAF0D7", "#A76F6F"),
+                    labels = c("TAIR10", "New")) +
+  xlab('Pangenome coordinate') + 
+  ylab('Absolute amount, non-TE genes') +
+  guides(fill=guide_legend(title="Genes"),)  +
+  theme(legend.position = c(0.89, 0.65),
+        legend.background = element_rect(fill = "white", color = "grey20")) 
+  
+g
+
+pdf(paste(path.figures, 'gene_chr_distr_no_te.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+## New genes with te content - chr
+```{r}
+
+g <- ggplot(gff.new, 
+            aes(x=V4, fill = te)) + 
+  geom_histogram(bins = 50,color='grey20', alpha=0.7) +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+    xlab('Pangenome coordinate') + 
+  ylab('Absolute amount') +
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  guides(fill=guide_legend(title="TE \ncoverage")) +
+  theme(legend.position = c(0.9, 0.45),
+        legend.background = element_rect(fill = "white", color = "grey20")) +
+ theme(legend.key.size = unit(0.4,"cm"))
+
+g
+
+pdf(paste(path.figures, 'gene_chr_distr_new_genes_te.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+## Pie and Bar of TEs in new genes
+```{r}
+g <- ggplot(gff.new, aes(x = "", fill = te)) +
+  geom_bar(width = 1, stat = "count", alpha = 0.7, 
+           color = c(rep(NA, 5), rep('black', 6))) +
+  coord_polar(theta = "y") +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  guides(fill = FALSE) +
+  theme_void()
+g
+
+pdf(paste(path.figures, 'gene_distr_new_genes_te_pie.pdf', sep = ''), width = 2, height = 2)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+g <- ggplot(gff.new, aes(x = te, fill = te)) +
+  geom_rect(aes(xmin = -Inf, xmax = 6, ymin = -Inf, ymax = Inf),
+            fill = "#FDF9D3") +
+  geom_rect(aes(xmin = 6, xmax = Inf, ymin = -Inf, ymax = Inf),
+            fill = "#D1C8D5") +
+  # geom_histogram(width = 1, stat = "count", alpha = 0.7, 
+  #          color = c(rep(NA, 5), rep('black', 6))) +
+  geom_histogram(width = 1, stat = "count", alpha = 0.7, 
+           color = rep('grey20', 11)) +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  scale_x_discrete(limits=rev) +
+  guides(fill = FALSE) +
+  theme_minimal() + 
+  annotate("text", x = 0, y = 4000, label = paste("New genes; total:", nrow(gff.new)),
+             hjust = 0, vjust = 1) + ylab(NULL) +
+  annotate("text", x = 2, y = 2000, label = paste("not TE"),
+             hjust = 0, vjust = 1, size = 6, color = '#F5C344', fontface = "bold") +
+    annotate("text", x = 7.5, y = 2000, label = paste("TE"),
+             hjust = 0, vjust = 1, size = 6, color = '#604260', fontface = "bold") + xlab('TE coverage')
+
+g
+
+
+pdf(paste(path.figures, 'gene_distr_new_genes_te_bar.pdf', sep = ''), width = 3, height = 1.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+
+# SVs and new genes
+## Read SVs
+```{r}
+
+
+
+
+# sv.pos.beg = read.table(paste(path.sv, 'svs_all_beg_pos_v03.txt', sep = ''), 
+#                         stringsAsFactors = F,check.names=FALSE)
+# sv.pos.end = read.table(paste(path.sv, 'svs_all_end_pos_v03.txt', sep = ''), 
+#                         stringsAsFactors = F,check.names=FALSE)
+# 
+# sv.chr = as.numeric(sapply(strsplit(rownames(sv.pos.end), "_"), function(x) x[2]))
+
+file.sv.all = 'sv_all_events.rds'
+sv.all = readRDS(paste(path.svs, file.sv.all, sep = ''))
+rownames(sv.all) = sv.all$gr
+
+
+
+```
+
+
+## New genes in SVs
+```{r}
+
+gff.new$sv = 0
+
+for(i.chr in 1:5){
+  message(paste('Chromosome', i.chr))
+  gff.new.chr = gff.new[gff.new$chr == i.chr,]
+  sv.all.chr = sv.all[sv.all$chr == i.chr,]
+  sv.all.chr$beg = sv.all.chr$beg + 1
+  intersect(sv.all.chr$beg, sv.all.chr$end)
+  
+  pos = rep(0, 50000000)
+  pos[sv.all.chr$beg] = 1
+  pos[sv.all.chr$end] = -1
+  pos = cumsum(pos)
+  
+  if(max(pos) != 1) stop()
+  
+  for(irow in 1:nrow(gff.new.chr)){
+    gff.new.chr$sv[irow] = sum(pos[gff.new.chr$V4[irow]:gff.new.chr$V5[irow]])
+  }
+  
+  gff.new[gff.new$chr == i.chr,] = gff.new.chr
+}
+beepr::beep()
+
+gff.new$len = gff.new$V5 - gff.new$V4 + 1
+table((gff.new$sv / gff.new$len) > 0.9)
+
+gff.new$in.sv = (gff.new$sv / gff.new$len)
+gff.new$in.sv[gff.new$in.sv > 1] = 1
+
+table(gff.new$in.sv > 0.9)
+
+g <- ggplot(gff.new, aes(x = in.sv, fill = te)) +
+  geom_histogram(binwidth = 0.1, color = "black", alpha = 0.7) +
+  labs(x = "% of a new gene covered by SVs", y = "Number of new genes") +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  theme_minimal() +  
+  guides(fill=guide_legend(title="TE coverage",nrow = 3)) +
+  theme(legend.position = c(0.1, 0.9),
+        legend.background = element_rect(fill = "white", color = "grey20"),
+        legend.justification = c(0, 1)) +
+ theme(legend.key.size = unit(0.4,"cm"))
+g
+
+pdf(paste(path.figures, 'genes_new_sv.pdf', sep = ''), width = 4, height = 3)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+## Stat
+```{r}
+
+table(gff.new$in.sv >= 0.9)
+table(gff.new$is.te[gff.new$in.sv >= 0.9])
+
+table(gff.new$in.sv <= 0.1)
+table(gff.new$is.te[gff.new$in.sv <= 0.1])
+```
+
+
+# Sim group and new genes
+```{r}
+
+g <- ggplot(gff.new, aes(x = in.sv, fill = dup)) +
+  geom_histogram(binwidth = 0.1, alpha = 1) +
+  labs(x = "% of a new gene covered by SVs", y = "Number of new genes") +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  scale_fill_manual(values = c("TRUE" = "#FF8551", "FALSE" = "#9BCDD2"),
+                    labels= c('unique', 'duplicated')) +
+  guides(fill = guide_legend(title = "")) +
+  theme_minimal()
+g
+
+
+pdf(paste(path.figures, 'genes_new_dup_simgr.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+## CNV-SV
+```{r}
+
+g <- ggplot(gff.new, aes(x = in.sv, fill = as.character(cnv))) +
+  geom_histogram(binwidth = 0.1, alpha = 1) +
+  labs(x = "% of a new gene covered by SVs", y = "Number of new genes") +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  scale_fill_manual(values = c("1" = "#FF8551", "0" = "#9BCDD2"),
+                    labels= c('unique', 'duplicated')) +
+  guides(fill = guide_legend(title = "")) +
+  theme_minimal()
+g
+
+
+pdf(paste(path.figures, 'genes_new_dup_cnv.pdf', sep = ''), width = 3.5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+table(gff.new$cnv[gff.new$sv >= 0.9])
+table(gff.new$cnv[gff.new$sv <= 0.1])
+genes.special = gff.new$group[(gff.new$sv >= 0.9)&(gff.new$cnv == 0)&(gff.new$is.te == 0)]
+
+```
+
+
+## Duplications and TE
+```{r}
+
+gff.new$pos.sv.dup <- (round(gff.new$in.sv * 10)  - (0.5 - gff.new$cnv) * 0.35) / 10
+gff.new$is.not.te = as.numeric(as.character(gff.new$te)) <= te.cutoff
+
+col.tmp = c('#8B7594','#FFF5AB','#654062','#FFC107')
+names(col.tmp) = as.character(0:3)
+gff.new$tmp = gff.new$cnv * 2 + gff.new$is.not.te
+
+
+g <- ggplot(gff.new, aes(x = pos.sv.dup, fill = as.character(tmp))) +
+  theme_minimal() +
+  geom_bar(position = 'stack', width = 0.03, color = '#121013', size = 0.2) +
+  scale_fill_manual(values = col.tmp,labels= c('unique, TE', 'unique, not TE', 'duplicated, TE', 'duplicated, not TE')) +
+  labs(x = "% of a new gene covered by SVs", y = "Number of new genes") +
+  # viridis::scale_fill_viridis(discrete=TRUE, labels = c('TE', 'Not TE')) +
+  scale_x_continuous(breaks = seq(0, 1, 0.1))+
+  theme(panel.grid.minor = element_blank()) +
+  labs(fill = "", color = "")+ 
+  # theme(legend.position="bottom") +
+  # 
+  guides(fill=guide_legend(ncol=2)) + 
+  theme(legend.position = c(0.5, 0.85))
+  
+g
+
+pdf(paste(path.figures, 'genes_new_dup_simgr_sv.pdf', sep = ''), width = 5, height = 3.5)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+# Fix files
+
+## Identify reduced genes
+```{r}
+# Find the minimum length of every gene by mRNA in "own files"
+path.genes.v04 = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes/', sep = '')
+
+# path.genes
+acc.gff.files <- list.files(path = path.genes.v04, pattern = paste("^genes_v04_\\d+\\.gff$", sep = ''))
+# Извлекаем числа из имен файлов
+accessions <- gsub(paste("^genes_v04_(\\d+)\\.gff$", sep= ''), "\\1", acc.gff.files)
+
+gr.m.len = c()
+gr.g.len = c()
+
+for(i.f in 1:length(acc.gff.files)){
+  message(accessions[i.f])
+  gff.acc = read.table(paste(path.genes.v04, acc.gff.files[i.f], sep = ''), stringsAsFactors = F)
+  gff.acc$len = abs(gff.acc$V4 - gff.acc$V5) + 1
+  gff.acc.g = gff.acc[gff.acc$V3 == 'gene',]
+  gff.acc.m = gff.acc[gff.acc$V3 == 'mRNA',]
+  
+  gr.acc.g <- gsub("^.*ID=([^;]+).*$", "\\1", gff.acc.g$V9)
+  gr.acc.m <- gsub("^.*ID=([^\\.]+).*$", "\\1", gff.acc.m$V9)
+  
+  
+  gr.m.len = rbind(gr.m.len, data.frame(group = gr.acc.m, len = gff.acc.m$len, acc = accessions[i.f]))
+  gr.g.len = rbind(gr.g.len, data.frame(group = gr.acc.g, len = gff.acc.g$len, acc = accessions[i.f]))
+  
+}
+
+gr.len.min = tapply(gr.m.len$len, gr.m.len$group, min) 
+
+# tair-10 lengths
+all_lines = readLines(paste(path.tair10, 'new_genes.fasta', sep = ''))
+tair10.names <- all_lines[grep("^>",all_lines)]
+tair10.len = as.numeric(sapply(tair10.names, function(s) strsplit(s, '\\|')[[1]][5]))
+names(tair10.len) = stringr::str_extract(tair10.names, "[^|]+$")
+gr.len.min = c(gr.len.min, tair10.len)
+
+gr.g.len$low = gr.g.len$len < gr.len.min[gr.g.len$group] * 0.8
+gr.g.len$min = gr.len.min[gr.g.len$group]
+
+beepr::beep()
+```
+
+## Reading gff
+```{r}
+
+# path.genes
+acc.gff.files <- list.files(path = path.genes.v04, pattern = paste("^genes_v04_\\d+\\.gff$", sep = ''))
+# Извлекаем числа из имен файлов
+accessions <- gsub(paste("^genes_v04_(\\d+)\\.gff$", sep = ''), "\\1", acc.gff.files)
+
+gr.g.acc = matrix(0, nrow = length(unique(gff.genes$group)), ncol = length(accessions),
+                  dimnames = list(unique(gff.genes$group), accessions))
+gr.m.acc = matrix(0, nrow = length(unique(gff.genes$group)), ncol = length(accessions),
+                  dimnames = list(unique(gff.genes$group), accessions))
+
+for(i.f in 1:length(acc.gff.files)){
+  message(accessions[i.f])
+  gff.acc = read.table(paste(path.genes.v04, acc.gff.files[i.f], sep = ''), stringsAsFactors = F)
+  gff.acc.g = gff.acc[gff.acc$V3 == 'gene',]
+  gff.acc.m = gff.acc[gff.acc$V3 == 'mRNA',]
+  
+  
+  gr.acc.g <- gsub("^.*ID=([^;]+).*$", "\\1", gff.acc.g$V9)
+  gr.acc.m <- gsub("^.*ID=([^\\.]+).*$", "\\1", gff.acc.m$V9)
+  
+  gr.g.acc[gr.acc.g, accessions[i.f]] = 1
+  gr.m.acc[gr.acc.m, accessions[i.f]] = 1
+  
+}
+beepr::beep()
+
+
+## Fix frequency of presence
+comb.remove = gr.g.len[gr.g.len$low,]
+for(irow in 1:nrow(comb.remove)){
+  gr.g.acc[comb.remove$group[irow], comb.remove$acc[irow]] = 0  
+}
+
+gr.g.acc[gr.m.acc == 1] = 1
+table(rowSums(gr.g.acc))
+
+```
+
+
+## Save new version of gff
+### Own coordinates
+```{r}
+path.genes.new = paste(path.base, '01_data_common/02_annot_denovo/02_pannagram/genes_05/', sep = '')
+if (!dir.exists(path.genes.new)) dir.create(path.genes.new)
+
+
+for(i.f in 1:length(acc.gff.files)){
+  
+  gr.remove = rownames(gr.g.acc)[gr.g.acc[,i.f] == 0]
+  
+  message(paste(accessions[i.f], length(gr.remove)))
+  
+  gff.acc = read.table(paste(path.genes, acc.gff.files[i.f], sep = ''), stringsAsFactors = F)
+  gff.acc$gr = ''
+  
+  gff.acc.g = gff.acc[gff.acc$V3 == 'gene',]
+  gff.acc.g$gr <- gsub("^.*ID=([^;]+).*$", "\\1", gff.acc.g$V9)
+  gff.acc[gff.acc$V3 == 'gene',] = gff.acc.g
+  
+  gff.acc.g = gff.acc[gff.acc$V3 != 'gene',]
+  gff.acc.g$gr <- gsub("^.*ID=([^\\.]+).*$", "\\1", gff.acc.g$V9)
+  gff.acc[gff.acc$V3 != 'gene',] = gff.acc.g
+  
+  gff.acc.trimmed = gff.acc[!(gff.acc$gr %in% gr.remove),]
+  
+  options(scipen = 999)
+  write.table(gff.acc.trimmed[,1:9],
+              paste(path.genes.new, sub("04", "05", acc.gff.files[i.f]) , sep = ''), 
+              sep = '\t', quote = F, row.names = F, col.names = F)
+  options(scipen = 0)
+}
+
+
+```
+
+
+### Pangen coordinates
+```{r}
+gff.pan = read.table(paste(path.genes, 'genes_v04_pangen_cleaning01.gff', sep = ''), stringsAsFactors = F)
+idx.genes = which(gff.pan$V3 == 'gene')
+
+for(i.f in 1:length(accessions)){
+  idx.acc = grep(paste('\\.',accessions[i.f],sep = ''), gff.pan$V9)
+  gff.acc = gff.pan[unique(sort(c(idx.genes, idx.acc))),]
+  
+  gr.remove = rownames(gr.g.acc)[gr.g.acc[,i.f] == 0]
+  
+  message(paste(accessions[i.f], length(gr.remove)))
+  
+  gff.acc$gr = ''
+  gff.acc.g = gff.acc[gff.acc$V3 == 'gene',]
+  gff.acc.g$gr <- gsub("^.*ID=([^;]+).*$", "\\1", gff.acc.g$V9)
+  gff.acc[gff.acc$V3 == 'gene',] = gff.acc.g
+  
+  gff.acc.g = gff.acc[gff.acc$V3 != 'gene',]
+  gff.acc.g$gr <- gsub("^.*ID=([^\\.]+).*$", "\\1", gff.acc.g$V9)
+  gff.acc[gff.acc$V3 != 'gene',] = gff.acc.g
+  
+  gff.acc.trimmed = gff.acc[!(gff.acc$gr %in% gr.remove),]
+  
+  options(scipen = 999)
+  write.table(gff.acc.trimmed[,1:9],
+              paste(path.genes.new, sub("04", "05_pangen", acc.gff.files[i.f]) , sep = ''), 
+              sep = '\t', quote = F, row.names = F, col.names = F)
+  options(scipen = 0)
+  
+}
+
+
+
+```
+
+
+
+# Haim: new genes annotation
+```{r}
+library(stringr)
+
+path.annot = paste(path.base, '01_data/04_annotation/04_new_genes/', sep = '')
+file.annot = 'new_genes_by_Anna_Annotation.clean.with_final_class.txt'
+
+haim.ann = read.delim(paste(path.annot, file.annot, sep = ''), stringsAsFactors = F)
+
+s.annot = list(te = 'TE', te.like = 'TE-like', 
+               nt.tair10 = 'nucl_tair10', prot.tair10 = 'protein_tair10',
+               prot.thal = 'protein_thaliana',
+               other.sp = 'other_species',
+               no.homology = 'partial_or_no_homology')
+
+
+
+colors_new_types = setNames(
+  c('#604260', '#877692', '#379237', '#82CD47', '#EFD345', '#C06014', 'grey'),
+  c(s.annot$te, s.annot$te.like, s.annot$nt.tair10, s.annot$prot.tair10, s.annot$prot.thal, s.annot$other.sp, s.annot$no.homology)
+)
+
+```
+
+## Rename and redefine
+```{r}
+haim.ann$class6[haim.ann$class6 == 'TE'] = 
+haim.ann$class6[haim.ann$UNIPROT.class == "Reverse transcriptase"] = s.annot$te.like
+haim.ann$class6[haim.ann$Atgrp_name %in% gff.new$group[gff.new$is.te]] = s.annot$te
+
+haim.ann$class6[haim.ann$class6 == 'TAIR10_Paralog_Translocation'] = s.annot$nt.tair10
+haim.ann$class6[haim.ann$class6 == 'TAIR10_Paralog_Translocation?'] = s.annot$prot.tair10
+
+idx.thal = grepl('thaliana', haim.ann$UNIPROT.Organism)
+haim.ann$class6[(haim.ann$class6 == 'Other_Homolog') & idx.thal] = s.annot$prot.thal
+haim.ann$class6[haim.ann$class6 == 'Other_Homolog'] = s.annot$other.sp
+haim.ann$class6[haim.ann$class6 == 'Partial_or_No_homology'] = s.annot$no.homology
+
+
+rownames(haim.ann) = haim.ann$Atgrp_name
+
+gff.new$annot = haim.ann[gff.new$group,]$class6
+gff.new$go = haim.ann[gff.new$group,]$UNIPROT.class
+
+```
+
+## Plot GO
+```{r}
+haim.go = table(haim.ann$UNIPROT.class, haim.ann$class6)
+haim.go = haim.go[,!(colnames(haim.go) %in% c(s.annot$te, s.annot$no.homology, s.annot$te.like))]
+haim.go.total = rowSums(haim.go)
+haim.go = cbind(haim.go, total = haim.go.total)
+haim.go = t(haim.go[!rowSums(haim.go) == 0,])
+
+tot.cnt = sort(colSums(haim.go))
+haim.go = reshape2::melt(haim.go)
+haim.go$Var2 = factor(haim.go$Var2, levels = names(tot.cnt))
+haim.go$Var1 = factor(haim.go$Var1, levels = c('total',
+                                               s.annot$other.sp,
+                                               s.annot$prot.thal,
+                                               s.annot$prot.tair10,
+                                               s.annot$nt.tair10))
+
+
+haim.go <- haim.go %>%
+  mutate(val.category = cut(value, 
+                              breaks = c(-Inf, 5, 10, 50, 100, 200, Inf), 
+                              labels = c("[1-5]","(5-10]", "(10-50]", "(50-100]", "(100-200]", ">200")))
+
+n.extra = 0
+colors_go = col_generator(length(unique(haim.go$val.category))+n.extra)
+if(n.extra != 0 )colors_go = colors_go[-(1:n.extra)]
+names(colors_go) = unique(haim.go$val.category)
+
+
+colors_go <- colorRampPalette(c('#AED8CC',"#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length(unique(haim.go$val.category)))
+names(colors_go) = unique(haim.go$val.category)
+
+
+p = ggplot(haim.go, aes(x = Var2, y = Var1, color = val.category, size = value)) + 
+  geom_point() + theme_minimal() + 
+  scale_color_manual(values = colors_go, name = "# of genes")  +
+  # geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
+  #             aes(x=Var2, y=Var1, label = round(value, 2)), 
+  #             size = 2.5, color = 'black', 
+  #           nudge_x = 0.3,
+  #           nudge_y = 0) +
+  guides(alpha = "none", size = 'none') +
+  xlab(NULL) + ylab(NULL) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p
+
+# 
+# pdf(paste(path.figures, 'go_categories.pdf', sep = ''), width = 8, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+```
+
+
+### Plot GO - freq
+```{r}
+
+tmp.freq = read.table('/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/02_analysis/03_annotation/01_data/genes_v05_freq_loci.txt')
+rownames(tmp.freq) = gsub('ID=', '',rownames(tmp.freq))
+
+
+
+haim.go = table(haim.ann$UNIPROT.class, tmp.freq[rownames(haim.ann),]$freq)
+# haim.go = haim.go[,!(colnames(haim.go) %in% c(s.annot$te, s.annot$no.homology, s.annot$te.like))]
+# haim.go.total = rowSums(haim.go)
+# haim.go = cbind(haim.go, total = haim.go.total)
+haim.go = t(haim.go[!rowSums(haim.go) == 0,])
+
+tot.cnt = sort(colSums(haim.go))
+haim.go = reshape2::melt(haim.go)
+haim.go$Var2 = factor(haim.go$Var2, levels = names(tot.cnt))
+# haim.go$Var1 = factor(haim.go$Var1, levels = c('total',
+#                                                s.annot$other.sp,
+#                                                s.annot$prot.thal,
+#                                                s.annot$prot.tair10,
+#                                                s.annot$nt.tair10))
+
+
+haim.go <- haim.go %>%
+  mutate(val.category = cut(value, 
+                              breaks = c(-Inf, 5, 10, 50, 100, 200, Inf), 
+                              labels = c("[1-5]","(5-10]", "(10-50]", "(50-100]", "(100-200]", ">200")))
+
+n.extra = 0
+colors_go = col_generator(length(unique(haim.go$val.category))+n.extra)
+if(n.extra != 0 )colors_go = colors_go[-(1:n.extra)]
+names(colors_go) = unique(haim.go$val.category)
+
+
+colors_go <- colorRampPalette(c('#AED8CC',"#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length(unique(haim.go$val.category)))
+names(colors_go) = unique(haim.go$val.category)
+
+
+p = ggplot(haim.go, aes(x = Var2, y = Var1, color = val.category, size = value)) + 
+  geom_point() + theme_minimal() + 
+  scale_color_manual(values = colors_go, name = "# of genes")  +
+  # geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
+  #             aes(x=Var2, y=Var1, label = round(value, 2)), 
+  #             size = 2.5, color = 'black', 
+  #           nudge_x = 0.3,
+  #           nudge_y = 0) +
+  guides(alpha = "none", size = 'none') +
+  xlab(NULL) + ylab(NULL) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p
+
+# 
+# pdf(paste(path.figures, 'go_categories.pdf', sep = ''), width = 8, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+```
+
+## Pie chart
+```{r}
+
+haim.new = as.data.frame(table(haim.ann$class6))
+
+haim.new$Var1 = factor(haim.new$Var1, levels = s.annot)
+
+p = ggplot(haim.new, aes(x = "", y = Freq, fill = Var1)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y") +
+  labs(fill = "", title = NULL) +
+  scale_fill_manual(values = colors_new_types) + 
+  theme_void() +
+  theme(legend.position="right") +
+  geom_text(aes(label = Freq, x = 1.7), position = position_stack(vjust = 0.5))
+p
+
+pdf(paste(path.figures, 'go_gene_types.pdf', sep = ''), width = 5, height = 3)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+haim.new.part = haim.new[haim.new$Var1 != s.annot$te,]
+
+p = ggplot(haim.new.part, aes(x = "", y = Freq, fill = Var1)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y") +
+  labs(fill = "", title = NULL) +
+  scale_fill_manual(values = colors_new_types) + 
+  theme_void() +
+  theme(legend.position="right") +
+  geom_text(aes(label = Freq, x = 1.7), position = position_stack(vjust = 0.5))
+p
+
+pdf(paste(path.figures, 'go_gene_types_note.pdf', sep = ''), width = 5, height = 3)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+## Along chromosomes
+```{r}
+
+gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te,
+                                           s.annot$te.like)),]
+
+
+# gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te)),]
+
+g <- ggplot(gff.new.part, 
+            aes(x=V4, fill = annot)) + 
+  geom_histogram(bins = 50, color='grey20') +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+    xlab('Pangenome coordinate') + 
+  ylab('Absolute amount') +
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  scale_fill_manual(values = colors_new_types) +
+  guides(fill=guide_legend(title="TE \ncoverage")) +
+  theme(
+    # legend.position = c(0.9, 0.45),
+    legend.position = "none",
+        legend.background = element_rect(fill = "white", color = "grey20")) +
+ theme(legend.key.size = unit(0.4,"cm"))
+
+g
+
+pdf(paste(path.figures, 'genes_new_go_along_chr.pdf', sep = ''), width = 6, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+# pdf(paste(path.figures, 'gene_chr_distr_new_genes_te.pdf', sep = ''), width = 5, height = 4)
+# print(g)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+```
+
+# Frequency of presence
+## Prepare matrices
+```{r}
+
+acc.gff.files <- list.files(path = path.genes, pattern = paste("^genes_",s.version,"_\\d+\\.gff$", sep = ''))
+# Извлекаем числа из имен файлов
+accessions <- gsub(paste("^genes_",s.version,"_(\\d+)\\.gff$", sep = ''), "\\1", acc.gff.files)
+
+gr.g.acc = matrix(0, nrow = length(unique(gff.genes$group)), ncol = length(accessions),
+                  dimnames = list(unique(gff.genes$group), accessions))
+gr.m.acc = matrix(0, nrow = length(unique(gff.genes$group)), ncol = length(accessions),
+                  dimnames = list(unique(gff.genes$group), accessions))
+
+for(i.f in 1:length(accessions)){
+  message(accessions[i.f])
+  gff.acc = read.table(paste(path.genes, acc.gff.files[i.f], sep = ''), stringsAsFactors = F)
+  gff.acc.g = gff.acc[gff.acc$V3 == 'gene',]
+  gff.acc.m = gff.acc[gff.acc$V3 == 'mRNA',]
+  
+  gr.acc.g <- gsub("^.*ID=([^;]+).*$", "\\1", gff.acc.g$V9)
+  gr.acc.m <- gsub("^.*ID=([^\\.]+).*$", "\\1", gff.acc.m$V9)
+  
+  gr.g.acc[gr.acc.g, accessions[i.f]] = 1
+  gr.m.acc[gr.acc.m, accessions[i.f]] = 1
+  
+}
+
+```
+
+
+## Frequency distribution
+### Annotation
+```{r}
+
+gff.new$annot = factor(gff.new$annot, levels = s.annot)
+
+gff.new$freq = as.factor(rowSums(gr.g.acc[gff.new$group,]))
+
+
+g1 <- ggplot(gff.new, aes(x = freq, fill = annot)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = c(0.5, 0.85)) +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(nrow = 4))
+g1
+
+
+
+g2 <- ggplot(gff.new, aes(x = freq, fill = annot)) +
+  theme_minimal() +
+  geom_bar(position = 'fill', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('') +
+  theme(axis.text.x = element_text(size = 7))+
+  theme(legend.position = "none") 
+   
+g2
+
+
+g = ggpubr::ggarrange(g1 + xlab(NULL)+ theme(axis.text.x = element_blank()) + theme(legend.position = "none") , 
+                      g2, ncol = 1, nrow = 2, heights = c(1, 1.2))
+g
+
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+
+
+
+
+```
+
+### Annotation without TE
+```{r}
+
+gff.new$annot = factor(gff.new$annot, levels = s.annot)
+
+gff.new$freq = as.factor(rowSums(gr.g.acc[gff.new$group,]))
+
+gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te, s.annot$te.like)),]
+
+
+g1 <- ggplot(gff.new.part, aes(x = freq, fill = annot)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = c(0.5, 0.85)) +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(nrow = 4))
+g1
+
+
+
+g2 <- ggplot(gff.new.part, aes(x = freq, fill = annot)) +
+  theme_minimal() +
+  geom_bar(position = 'fill', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('') +
+  theme(axis.text.x = element_text(size = 7))+
+  theme(legend.position = "none") 
+   
+g2
+
+
+g = ggpubr::ggarrange(g1 + xlab(NULL)+ theme(axis.text.x = element_blank()) + theme(legend.position = "none") , 
+                      g2, ncol = 1, nrow = 2, heights = c(1, 1.2))
+g
+
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot_note.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+
+
+
+
+```
+
+#### Extremes only 
+```{r}
+
+gff.new.part.extreme = gff.new.part[(gff.new.part$freq == 1) | (gff.new.part$freq == 27),]
+g2 <- ggplot(gff.new.part.extreme, aes(x = as.factor(freq), fill = annot)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  scale_x_discrete(breaks = c(1, 27), labels = c("Singletons", "Universal")) +
+  xlab(NULL) + ylab('# of genes') +
+  labs(fill = NULL) + ylab('') +
+  theme(axis.text.x = element_text(size = 7))+
+  theme(legend.position = "none")  +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+g2
+
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot_note_estreme.pdf', sep = ''), width = 1.5, height = 3)
+print(g2)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+
+#### Collapsed
+```{r}
+gff.new.part = gff.new[!(gff.new$annot %in% c(s.annot$te, s.annot$te.like)),]
+# gff.new.part = gff.new.part[gff.new.part$express,]
+
+gff.new.part$pos = 0
+gff.new.part$freq = as.numeric(as.character(gff.new.part$freq))
+
+gap.rest = 0.1
+w.rest = 2
+p1 = gap.rest
+p2 = w.rest + 1 - gap.rest
+
+s1 = sum(gff.new.part$freq == 1)
+s2 = sum(gff.new.part$freq == 27)
+s3 = nrow(gff.new.part) - s1 - s2
+y.annot = 1.1
+
+gff.new.part$pos[gff.new.part$freq == 1] = p1
+gff.new.part$pos[gff.new.part$freq == 27] = p2
+idx.rest = gff.new.part$freq %in% 2:26
+
+gff.new.part$pos[idx.rest] = ((gff.new.part$freq[idx.rest]) - 2) / 25 * w.rest + w.rest / 25 / 2 + 0.5
+
+g2 <- ggplot() +
+  theme_minimal() +
+  
+  # Узкие столбцы
+  geom_bar(data = filter(gff.new.part, !(freq %in% c(1, 27))),
+           aes(x =  as.numeric(pos), fill = annot),
+           position = 'fill', color = '#121013', size = 0.2, width = w.rest / 25) + 
+  
+  # Фланкирующие столбцы
+  geom_bar(data = filter(gff.new.part, freq %in% c(1, 27)),
+           aes(x = as.numeric(pos), fill = annot),
+           position = 'fill', color = '#121013', width = 0.5)  +
+  scale_fill_manual(values = colors_new_types) +
+  scale_x_continuous(breaks = c(p1, (p1+p2)/2, p2), labels = c("Singletons", "Freq: 2->26", "Universal")) +
+  scale_y_continuous(breaks = seq(0, 1, 0.25), labels =  seq(0, 1, 0.25), limits = c(0, 1.2)) +
+  xlab(NULL) + ylab(NULL) +
+  theme(legend.position = "none")  +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+   theme(panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_blank()) +
+  annotate("text", x = p1, y = y.annot, label = s1, size = 4) +
+  annotate("text", x = p2, y = y.annot, label = s2, size = 4) +
+  annotate("text", x = (p1 + p2) / 2, y = y.annot, label = s3, size = 4) +
+  annotate("text", x = (p1 + p2) / 2, y = 1.2, label = "Number of genes:", size = 4)
+
+g2
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_annot_note_collapsed.pdf', sep = ''), width = 3, height = 3)
+print(g2)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+### GO
+```{r}
+
+gff.new$annot = factor(gff.new$annot, levels = names(colors_new_types))
+
+gff.new$freq = as.factor(rowSums(gr.g.acc[gff.new$group,]))
+
+gff.new.cut = gff.new[gff.new$annot %in% c(s.annot$nt.tair10, 
+                                           s.annot$prot.tair10,
+                                           s.annot$prot.thal,
+                                           s.annot$other.sp),]
+
+gff.new.cut = gff.new.cut[gff.new.cut$go %in% names(haim.go.total)[haim.go.total > 100],]
+
+
+colors_go <- colorRampPalette(c('#071952', "#088395", '#85E6C5',
+                                "#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length(unique(gff.new.cut$go)))
+names(colors_go) = unique(gff.new.cut$go)
+
+
+g1 <- ggplot(gff.new.cut, aes(x = freq, fill = go)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_go) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes') +
+  # theme(legend.position = c(0.5, 0.85)) +
+  theme(legend.key.size = unit(0.4,"cm")) 
+g1
+
+
+
+
+
+
+# 
+# pdf(paste(path.figures, 'genes_new_freq_bar_abs.pdf', sep = ''), width = 4, height = 1)
+# print(g1)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+
+g2 <- ggplot(gff.new.cut, aes(x = freq, fill = go)) +
+  theme_minimal() +
+  geom_bar(position = 'fill', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_go) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes')
+  # theme(legend.position = c(0.5, 0.85)) +
+  # theme(legend.key.size = unit(0.4,"cm")) 
+  # guides(fill = guide_legend(nrow = 4))
+  
+   
+g2
+
+
+g = ggpubr::ggarrange(g1 + xlab(NULL)+ theme(axis.text.x = element_blank())  , 
+                      g2 + theme(legend.position = "none"), ncol = 1, nrow = 2, heights = c(1, 1.2))
+g
+
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_go.pdf', sep = ''), width = 5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+pdf(paste(path.figures, 'genes_new_freq_bar_combined_go_barplor.pdf', sep = ''), width = 8, height = 3)
+print(g2 )     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+
+
+
+
+```
+
+# Absolute values
+```{r}
+
+discrete_rainbow <- colour("discrete rainbow")
+
+cnt = as.data.frame(table(gff.new.cut$freq, gff.new.cut$go))
+
+cnt <- cnt %>%
+  mutate(val.category = cut(Freq, 
+                              breaks = c(-Inf, 5, 10, 50, 100, 200, Inf), 
+                              labels = c("[1-5]","(5-10]", "(10-50]", "(50-100]", "(100-200]", ">200")))
+cnt$val.category
+colors_go <- colorRampPalette(c('#AED8CC',"#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length( levels(cnt$val.category)))
+names(colors_go) = levels(cnt$val.category)
+
+
+
+
+
+p = ggplot(cnt, aes(x = Var1, y = Var2, size = Freq, color = val.category)) + 
+  geom_point() + theme_minimal() + 
+  # scale_color_viridis_c(na.value = 'white')  +
+  scale_color_manual(values = colors_go, name = "# of genes", na.value = 'white')  +
+  # geom_text(data = cnt.fam.sv[cnt.fam.sv$value >= 0.2,], 
+  #             aes(x=Var2, y=Var1, label = round(value, 2)), 
+  #             size = 2.5, color = 'black', 
+  #           nudge_x = 0.3,
+  #           nudge_y = 0) +
+  guides(alpha = "none", size = 'none') +
+  xlab(NULL) + ylab(NULL) + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+p
+
+
+pdf(paste(path.figures, 'genes_new_ge_freq.pdf', sep = ''), width = 8, height = 3)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+
+#### Facet by categories
+```{r}
+
+g2 <- ggplot(gff.new.cut, aes(x = freq, fill = go)) +
+  theme_minimal() +
+  geom_bar(position = 'fill', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_go) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes') +
+  # theme(legend.position = c(0.5, 0.85)) +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  # guides(fill = guide_legend(nrow = 4))
+  # theme(legend.position = "none") + 
+  facet_grid(rows = vars(annot))
+  
+   
+g2
+
+
+```
+
+
+## Pie-chart, categories, new genes
+```{r}
+
+
+gff.new.cut = gff.new[gff.new$annot %in% c(s.annot$nt.tair10, 
+                                           s.annot$prot.tair10,
+                                           s.annot$prot.thal,
+                                           s.annot$other.sp),]
+
+gff.new.cut = gff.new[gff.new$annot %in% c(s.annot$te, 
+                                           s.annot$te.like),]
+
+gff.new.cut$go[gff.new.cut$go %in% names(haim.go.total)[haim.go.total < 50]] = 'Other'
+# gff.new.cut = gff.new.cut[gff.new.cut$freq == 27,]
+
+
+cnt.go = as.data.frame(table(gff.new.cut$go))
+cnt.go.expr = as.data.frame(table(gff.new.cut[gff.new.cut$express,]$go))
+
+
+colors_go <- colorRampPalette(c('#071952', "#088395", '#85E6C5',
+                                "#F2D388", "#F39F5A", '#BB2525', '#57375D'))(length(unique(cnt.go$Var1)))
+# colors_go = sample(colors_go, length(colors_go))
+names(colors_go) = unique(cnt.go$Var1)
+
+cnt.go$x2 = cnt.go.expr$Freq / cnt.go$Freq
+cnt.go$y2 = cumsum(cnt.go$Freq)
+cnt.go$y1 =  cnt.go$y2 - cnt.go$Freq
+cnt.go$y.text = (cnt.go$y2 + cnt.go$y1) / 2
+
+p = ggplot(data = cnt.go) + 
+  geom_rect(aes(ymin = y1, ymax = y2, xmin = 0, xmax = 1, fill = Var1), alpha = 0.7) + 
+  geom_rect(aes(ymin = y1, ymax = y2, xmin = 0, xmax = x2, fill = Var1), color = 'black') + 
+  labs(fill = "", title = NULL) +
+  guides(color = 'none') +
+  theme_minimal() +
+  # scale_fill_discrete(name = "Var1") +
+  ylab("Var1") + 
+  xlab("Value") +
+  scale_fill_manual(values = colors_go) +
+  scale_color_manual(values = colors_go) + 
+   coord_polar(theta = "y")  +
+  geom_text(aes(label = paste(Freq, round(x2, 1), sep = '/'), x = 1.3, y = (y1 + y2)/2, color = Var1)) +
+# +
+  theme_void()
+
+p
+
+pdf(paste(path.figures, 'genes_new_go_freq_pie_expression.pdf', sep = ''), width = 6, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+```
+
+
+
+
+
+### Te-nonTE
+```{r}
+
+
+gff.new$freq = as.factor(rowSums(gr.g.acc[gff.new$group,]))
+
+
+g1 <- ggplot(gff.new, aes(x = freq, fill = is.te)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = c('FALSE' = "#FCEF89",'TRUE' = "#785486"),
+                    labels = c('Not TE', 'TE')) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = c(0.5, 0.85)) +
+  theme(legend.key.size = unit(0.4,"cm"))
+g1
+# 
+# pdf(paste(path.figures, 'genes_new_freq_bar_abs.pdf', sep = ''), width = 4, height = 1)
+# print(g1)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+
+g2 <- ggplot(gff.new, aes(x = freq, fill = is.te)) +
+  theme_minimal() +
+  geom_bar(position = 'fill', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = c('FALSE' = "#FCEF89",'TRUE' = "#785486"),
+                    labels = c('Not TE', 'TE')) +
+  xlab('Frequency of presence') +
+  labs(fill = NULL) + ylab('') +
+  theme(axis.text.x = element_text(size = 7))+
+  theme(legend.position = "none") 
+   
+g2
+
+
+g = ggpubr::ggarrange(g1 + xlab(NULL)+ theme(axis.text.x = element_blank()), g2, ncol = 1, nrow = 2, heights = c(1, 1.2))
+g
+
+```
+
+# Expression analysis
+
+## Alexandra
+```{r}
+gff.new.alex = read.table(paste(path.data, 'gff_new.with_expression_stats.txt', sep = ''), 
+                          stringsAsFactors = F, header = 1, sep = '\t')
+rownames(gff.new.alex) = gff.new.alex$group
+gff.new.alex = gff.new.alex[gff.new$group,]
+
+s.expr = list(expr.6909 = 'expr.6909',
+              na.6909 = 'na.6909',
+              noexpr.6909 = 'noexpr.6909',
+              noexpr.all = 'noexpr.all')
+
+gff.new$expr.gr = s.expr$noexpr.6909
+gff.new$expr.gr[gff.new.alex$expressed_in_6909] = s.expr$expr.6909
+gff.new$expr.gr[gff.new.alex$expressed_nowhere] = s.expr$noexpr.all
+gff.new$expr.gr[gr.g.acc[gff.new$group, '6909'] == 0] = s.expr$na.6909
+
+table(gff.new$expr.gr)
+
+```
+
+### Bar-plot
+```{r}
+gff.new.part = gff.new
+gff.new.part$go[gff.new.part$go %in% names(haim.go.total)[haim.go.total < 50]] = 'Other'
+
+
+# Define two groups: TE and non-TE
+idx.te = gff.new.part$annot %in% c(s.annot$te, s.annot$te.like)
+
+# Find maximum of TEs
+cnt.expr = table(gff.new.part$expr.gr[idx.te])
+cnt.expr.names = names(cnt.expr)
+y.min = -max(cnt.expr)
+
+# Find maximum of non-TEs
+cnt.expr = table(gff.new.part$expr.gr[!idx.te])
+cnt.expr.names = names(cnt.expr)
+y.max = max(cnt.expr)
+
+labels.df <- data.frame(
+  x = factor(cnt.expr.names, levels = cnt.expr.names),
+  y = c(cnt.expr) + 50,
+  label = paste(cnt.expr, ' (', round(cnt.expr/sum(cnt.expr), 2) * 100, '%)', sep = '')
+)
+
+gff.new.part$expr.gr = factor(gff.new.part$expr.gr, levels = cnt.expr.names)
+
+
+
+g <- ggplot(gff.new.part, aes(x = expr.gr, fill = annot)) +
+  theme_minimal() +
+  geom_bar(data = subset(gff.new.part, idx.te),
+           aes(y = - ..count.. ), position = 'stack', color = '#121013', size = 0.2) + 
+  geom_bar(data = subset(gff.new.part, !idx.te),
+           aes(y = + ..count.. ), position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  xlab(NULL) +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  # annotate("text", x = 1, y = y.max + 300, 
+  #          label = "Number of genes (%)", size = 4,
+  #          vjust = -0.5) + 
+  ylim(c(y.min, y.max + 400)) + 
+  geom_text(data = labels.df, aes(x = x, y = y, label = label), vjust = -0.5, inherit.aes = FALSE)
+
+g 
+
+
+pdf(paste(path.figures, 'genes_new_go_expr_',
+          c('all', 'no_te')[mode.no.te + 1],
+          '.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+```{r}
+g <- ggplot(gff.new.part, aes(y = expr.gr, fill = annot)) +
+  theme_minimal() +
+  geom_bar(data = subset(gff.new.part, idx.te),
+           aes(x = - ..count..), position = 'stack', color = '#121013', size = 0.2) + 
+  geom_bar(data = subset(gff.new.part, !idx.te),
+           aes(x = + ..count..), position = 'stack', color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  ylab(NULL) +
+  labs(fill = NULL) + xlab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  xlim(c(y.min, y.max + 400)) + 
+  geom_text(data = labels.df, aes(y = x, x = y, label = label), hjust = -0.5, inherit.aes = FALSE)
+g 
+```
+
+
+### Split-plot
+```{r}
+library(dplyr)
+gff.new$annot = factor(gff.new$annot, levels = s.annot)
+# gff.new.part$annot = factor(gff.new.part$annot,levels = rev(unlist(s.annot)))
+# gff.new.part = gff.new
+gff.new.part$idx.te = gff.new.part$annot %in% c(s.annot$te, s.annot$te.like)
+
+# Рассчитаем количество для каждой группы и типа
+count_df <- gff.new.part %>%
+  group_by(expr.gr, annot) %>%
+  summarise(count = n()) %>%
+  arrange(expr.gr, annot)
+
+# Создаем координаты для geom_rect
+count_df <- count_df %>%
+  group_by(expr.gr) %>%
+  mutate(ymin = lag(cumsum(count), default = 0),
+         ymax = cumsum(count)) %>%
+  ungroup()
+
+count_df$te = count_df$annot %in% c(s.annot$te, s.annot$te.like)
+
+
+y.shift = tapply(count_df[count_df$te,]$ymax, count_df[count_df$te,]$expr.gr, max)
+n.gap = 100
+y.te = c(-n.gap, n.gap)
+
+count_df$ymin = count_df$ymin - y.shift[count_df$expr.gr] + y.te[1*(!count_df$te) + 1]
+count_df$ymax = count_df$ymax - y.shift[count_df$expr.gr] + y.te[1*(!count_df$te) + 1]
+
+count_df$x = -as.numeric(count_df$expr.gr)
+
+labels.df <- count_df %>%
+  group_by(expr.gr, te) %>%
+  summarise(count = sum(count), .groups = "drop") %>%
+  mutate(x = ifelse(te == TRUE, -1 * count - n.gap, count + n.gap))
+labels.df = labels.df %>%
+  group_by(te) %>%
+  mutate(p = count / sum(count)) %>%
+  ungroup()
+labels.df$y = -as.numeric(labels.df$expr.gr)
+labels.df$label = paste(labels.df$count, ' (', round(labels.df$p, 2) * 100, '%)', sep = '')
+labels.df$xjust = c(0, 1)[labels.df$te*1 + 1]
+
+# New position
+labels.df$x = c(n.gap+10, -n.gap-10)[labels.df$te*1 + 1]
+
+x.tick = c(rev(-seq(0,3000,1000)) - n.gap, seq(0,2000,1000) + n.gap)
+x.tick.lab = c(rev(seq(0,3000,1000)), seq(0,2000,1000))
+
+n.width = 0.3
+g <- ggplot(count_df, aes(xmin = ymin, xmax = ymax, ymin = x-n.width, ymax = x+n.width, fill = annot)) +
+  theme_minimal() +
+  geom_vline(aes(xintercept = n.gap), color = "grey30") +
+  geom_vline(aes(xintercept = -n.gap), color = "grey30") +
+  geom_rect(color = '#121013', size = 0.2) + 
+  scale_fill_manual(values = colors_new_types) +
+  ylab(NULL) + xlab(NULL) +
+  labs(fill = NULL) + 
+  theme(legend.position = 'none') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  # guides(fill = guide_legend(ncol = 3)) +
+  geom_text(data = labels.df, aes(x = x, y = y + n.width + 0.05, label = label , hjust = xjust), 
+            vjust = 0,
+            inherit.aes = FALSE) +
+  scale_x_continuous(breaks = x.tick, labels = x.tick.lab) +
+  scale_y_continuous(breaks = -4:-1, labels = rev(levels(labels.df$expr.gr))) +
+  theme(panel.grid.minor.x = element_blank(), 
+          panel.grid.minor.y = element_blank()) 
+g 
+
+pdf(paste(path.figures, 'genes_new_annot_expr_horizontal.pdf', sep = ''), width = 5, height = 3)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+```{r}
+g <- ggplot(gff.new.part, aes(x = expr.gr, fill = go)) +
+  theme_minimal() +
+  geom_bar(position = 'stack', color = '#121013', size = 0.2) + 
+  # scale_fill_manual(values = colors_new_types) +
+  # scale_fill_manual(values = colors_go) +
+  xlab(NULL) +
+  labs(fill = NULL) + ylab('# of genes') +
+  theme(legend.position = 'bottom') +
+  theme(legend.key.size = unit(0.4,"cm")) +
+  guides(fill = guide_legend(ncol = 2)) +
+  # annotate("text", x = 1, y = y.max + 300, 
+  #          label = "Number of genes (%)", size = 4,
+  #          vjust = -0.5) + 
+  ylim(c(0, y.max + 400)) + 
+  geom_text(data = labels.df, aes(x = x, y = y, label = label), vjust = -0.5, inherit.aes = FALSE)
+
+g 
+
+
+pdf(paste(path.figures, 'genes_new_annot_expr_',
+          c('all', 'no_te')[mode.no.te + 1],
+          '.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+
+## DeSeq2
+```{r}
+library(DESeq2)
+
+
+res.all = list()
+s.tissues = c('F', 'P', 'S', 'R')
+for(s.tissue in s.tissues){
+  message(s.tissue)
+  
+  idx.tissue <- grep(paste("^",s.tissue,"\\.", sep = ''), colnames(g.exp))
+  
+  gene.expr = g.exp[,idx.tissue]
+  if(sum(is.na(gene.expr)) != 0){
+    gene.expr[is.na(gene.expr)] = 0
+  }
+  group.ref <- grepl("6909", colnames(gene.expr)) * 1
+  if(sum(group.ref) == 0) next
+  
+  
+  colData <- data.frame(ref=as.factor(group.ref))
+  
+  dds <- DESeqDataSetFromMatrix(countData = gene.expr, 
+                                colData = colData, 
+                                design = ~ ref)
+  dds <- DESeq(dds)
+  
+  res.all[[s.tissue]] <- results(dds)
+}
+
+# genes.target = gff.new$group[gff.new$annot == s.annot$prot.thal]
+genes.target = gff.new$group[gff.new$annot == s.annot$te]
+res.target = c()
+for(s.tissue in s.tissues){
+  res = res.all[[s.tissue]]  
+  res = res[genes.target,]
+  res$padj[res$stat > 0] = Inf
+  res.target = cbind(res.target, res$padj)
+}
+rownames(res.target) = genes.target
+
+res.target[grepl("AT3Gr", genes.target),]
+
+
+res = res[!is.na(res$pvalue),]
+res = res[order(res$padj),]
+res = res[res$stat < 0,]
+
+
+res.new = res[rownames(res) %in% genes.target,]
+
+
+hist(res.new$padj)
+
+
+genes.tair = gff.new$group[gff.new$have.tair]
+
+
+genes.tair = unique(gff.all$group[gff.all$tair.only == 1])
+res.new = res[rownames(res) %in% genes.tair,]
+
+hist(res.new$padj, 50)
+
+
+gene.expr.tair10 = gene.expr[]
+
+
+```
+
+
+
+## Old
+```{r}
+
+cnt = table(gff.new$express.f, gff.new$freq)
+cnt
+
+```
+
+
+
+```{r}
+g.exp.tmp = g.exp[g.new,]
+# hist(log(rowMax(as.matrix())),100)
+
+max.val <- apply(g.exp.tmp, MARGIN = 1, FUN = function(x) max(x, na.rm = TRUE))
+
+table(max.val < 10)
+
+
+
+mx = table(gff.mrna$group[gff.mrna$group %in% rownames(df.new.present)], 
+           gff.mrna$acc[gff.mrna$group %in% rownames(df.new.present)])
+mx = as.matrix(mx)
+mx = mx[rownames(df.new.present),]
+
+acc.common = intersect(colnames(mx), colnames(df.new.present))
+
+mx = mx[,acc.common]
+df.new.present = df.new.present[,acc.common]
+
+
+x = rowSums(mx)
+y = rowSums(df.new.present)
+
+
+data <- data.frame(x = x, y = y)
+
+# Создание графика точек с прозрачностью
+ggplot(data, aes(x = x, y = y)) +
+  geom_point(alpha = 0.1) +
+  labs(title = "График точек с прозрачностью", x = "x", y = "y") +
+  theme_minimal()
+
+
+```
+
+
+
+```{r}
+
+
+
+rownames(gff.genes) = gff.genes$group
+
+n = colSums(g.exp,na.rm = TRUE)
+
+x = colSums(g.exp[gff.genes$group[gff.genes$category == 'annogr_tair10'],],na.rm = TRUE) / n
+y = colSums(g.exp[gff.genes$group[gff.genes$category == 'new_genes'],],na.rm = TRUE) / n
+z = colSums(g.exp[gff.genes$group[gff.genes$category == 'tair10_only'],],na.rm = TRUE) / n
+
+df = data.frame(rbind(rbind(x, y),z))
+
+
+df.melt <- reshape2::melt(as.matrix(df))
+
+
+# Создание столбчатой диаграммы с накоплением
+ggplot(df.melt, aes(x = Var2, y = value, fill = Var1)) +
+  geom_bar(stat = "identity") +
+  labs(x = "X Label", y = "Y Label", title = "Stacked Barplot") +
+  scale_fill_manual(values = c("#F8766D", "#7CAE00", "#00BFC4")) +
+  theme_minimal()
+
+
+```
+
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("rtracklayer")
+
+library(rtracklayer)
+
+bw_file <- import.bw("/Volumes/Samsung_T5/vienn/expression/Flowers.1741.batchCT.F.bw")
+
+seqinfo(bw_file)
+
+```
+
+
+
+
+

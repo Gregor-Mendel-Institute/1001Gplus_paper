@@ -1,0 +1,114 @@
+---
+title: "Common statisticks"
+output: null_document
+---
+
+
+# Setup
+```{r}
+
+path.ann = '../../../01_data_common/01_tair10/'
+file.ann = 'TAIR10_GFF3_genes.gff'
+
+
+path.cen = '../../../02_analysis/06_snps/01_data/'
+file.cen = 'centr_bound.txt'
+
+```
+
+
+# How many genes are in the arms
+```{r}
+
+genes.gff = read.table(paste(path.ann, file.ann, sep = ''), stringsAsFactors = F)
+genes.gff = genes.gff[genes.gff$V3 == 'gene',]
+
+cen.pos = read.table(paste(path.cen, file.cen, sep = ''), stringsAsFactors = F, header = 1)
+
+n.cen = c()
+n.per = c()
+for(i.chr in 1:5){
+  gff.tmp = genes.gff[genes.gff$V1 == paste('Chr', i.chr, sep = ''),]
+  n.cen[i.chr] = sum((gff.tmp$V5 >= cen.pos$start[i.chr]) & (gff.tmp$V4 <= cen.pos$stop[i.chr]))
+  n.per[i.chr] = sum((gff.tmp$V5 >= cen.pos$start3[i.chr]) & (gff.tmp$V4 <= cen.pos$stop3[i.chr]))
+}
+
+sum(n.cen) / nrow(genes.gff)
+sum(n.per) / nrow(genes.gff)
+
+```
+
+
+# Length of chromosome of all accessions
+# ON SERVER
+```{r}
+
+#cd 'pacbio/pb_27'
+
+
+source('../pannagram/utils/utils.R')
+genome.files <- list.files(path = './', pattern = "\\.fasta$")
+
+genome.len = c()
+for(f in genome.files){
+  pokaz(f)
+  genome = readFastaMy(f)
+  genome.len = c(genome.len, sum(nchar(genome)))
+}
+
+
+
+```
+
+
+# Number of inversions
+```{r}
+file.blocks = '/Users/anna/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/02_analysis/05_synteny/01_data/blocks_all_v02.rds'
+
+blocks = readRDS(file.blocks)
+
+n.inv.all = c()
+df.inv = c()
+for(i.chr in 1:5){
+  message(i.chr)
+  blocks.chr = blocks[blocks$chr == i.chr,]
+  pan.pos = rep(0, max(blocks.chr$pan.e))
+  blocks.chr = blocks.chr[blocks.chr$pan.b > blocks.chr$pan.e,]
+  for(irow in 1:nrow(blocks.chr)){
+    pan.pos[blocks.chr$pan.b[irow]:blocks.chr$pan.e[irow]] = pan.pos[blocks.chr$pan.b[irow]:blocks.chr$pan.e[irow]] + 1
+  }
+  pan.pos = (pan.pos > 0) * 1
+  inv.beg = which(diff(pan.pos) == 1)
+  inv.end = which(diff(pan.pos) == -1)
+  n.inv = length(inv.beg)
+  
+  df.inv = rbind(df.inv, cbind(cbind(inv.beg, inv.end), i.chr))
+  
+  # plot()
+  
+  n.inv.all = c(n.inv.all,n.inv)
+  
+}
+
+
+df.inv = as.data.frame(df.inv)
+colnames(df.inv) = c('beg', 'end', 'chr')
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(df.inv, aes(x = beg, xend = end, y = 1, yend = 1)) + 
+  geom_segment(size = 1) + # Рисуем отрезки с цветом в зависимости от chr
+  facet_grid(rows = vars(chr))+
+  theme_bw() + 
+  labs(x = "Position", y = "Chromosome") + 
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) 
+
+
+
+
+```
+
+
+

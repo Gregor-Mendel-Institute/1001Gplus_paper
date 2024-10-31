@@ -1,0 +1,179 @@
+---
+title: "Figures for SVs"
+output: null_document
+---
+
+# Setup
+
+## My Libs
+```{r}
+
+path.base = '../../../'
+
+path.pannagram = paste(path.base, '../pannagram/', sep = '')
+
+source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
+source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
+source(paste(path.pannagram, 'utils/utils.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/dotplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/msaplot.R', sep = ''))
+source(paste(path.pannagram, 'visualisation/orfplot.R', sep = ''))
+```
+
+# Libs and paths
+```{r, message=FALSE}
+# library(cultevo)  #hammingdists
+library(ggplot2)
+# library(ggtree)
+# library('ggmsa')
+library(gridExtra)
+library(dplyr)
+# library(egg)
+
+path.base = '../../../'
+path.work = paste(path.base, '01_data/04_annotation/02_pannagram/svs/', sep = '')
+path.figures = paste(path.base, '02_analysis/04_sv/03_figures/', sep = '')
+path.genes = paste(path.base, '01_data/04_annotation/02_pannagram/genes/', sep = '')
+path.data.snps = paste(path.base, '02_analysis/06_snps/01_data/', sep = '')
+
+path.satur = paste(path.base, '02_analysis/07_saturation/', sep = '')
+
+# path.work = '/Volumes/Samsung_T5/vienn/work_sv/'
+# path.figures = paste(path.work, 'figures/', sep = '')
+
+# path.genes = '/Volumes/Samsung_T5/vienn/work_genomes/'
+
+file.sv = 'sv_se.rds'
+file.sv.all = 'sv_all_events.rds'
+
+```
+
+
+# Reading
+```{r}
+sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
+
+```
+
+## Saturation repeats
+```{r}
+sv.len = sv.all[,10:36]
+
+# sv.len.min = setNames(apply(sv.len, 1, min), NULL)
+# sv.len.max = setNames(apply(sv.len, 1, min), NULL)
+
+breaks = c(0, 15, 50, 100, 200, 500, 1000, 2000, 5000, 10000, Inf)
+
+sv.stat.all = c()
+for(n.acc in 2:27){
+  for(n.rep in 1:20){
+    pokaz('# accessions', n.acc, '# repeat', n.rep)
+    accs = sample(1:27, n.acc, replace = FALSE)
+    sv.len.tmp = sv.len[,accs]
+    
+    sv.len.min = setNames(apply(sv.len.tmp, 1, min), NULL)
+    sv.len.tmp = apply(sv.len.tmp, 2, function(x) x - sv.len.min)
+    
+    sv.len.max = setNames(apply(sv.len.tmp, 1, max), NULL)
+    
+    idx.remain = sv.len.max != 0
+    sv.len.tmp = sv.len.tmp[idx.remain, ,drop = F]
+    sv.len.max = sv.len.max[idx.remain]
+    
+  
+    freq.min = rowSums(apply(sv.len.tmp, 2, function(x) x <= sv.len.max * 0.15 ))
+    freq.max = rowSums(apply(sv.len.tmp, 2, function(x) x >= sv.len.max * 0.85 ))
+    
+    freq.tot = freq.min + freq.max
+    
+    # number of complex
+    idx.complex = freq.tot != n.acc
+    n.complex = sum(idx.complex)
+    
+    # numbr of SVs in breaks
+    sv.len.max = sv.len.max[!idx.complex]
+    
+    sv.stat <- table(cut(sv.len.max, breaks = breaks, right = TRUE, include.lowest = TRUE,
+              labels = c("[1, 15]", "(15, 50]", "(50, 100]", "(100, 200]", "(200, 500]",
+                         "(500, 1k]", "(1k, 2k]", "(2k, 5k]", "(5k, 10k]", "(10k, Inf)")))
+    # 
+    # sv.stat <- table(cut(sv.len.max, breaks = breaks, right = TRUE, include.lowest = TRUE,
+    #           labels = c("[1, 15]", "(15, 100]", "(100, 200]", "(200, 500]",
+    #                      "(500, 1k]", "(1k, 2k]", "(2k, 5k]", "(5k, 10k]", "(10k, Inf)")))
+  
+    sv.stat['complex'] = n.complex
+    sv.stat['n.acc'] = n.acc
+    pokaz(sv.stat)
+    sv.stat.all = rbind(sv.stat.all, sv.stat)
+  }
+  if(n.acc == 27) break
+}
+
+# saveRDS(sv.stat.all, '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus_paper/02_analysis/04_sv/01_data/sv_stat_all.rds')
+
+
+```
+
+
+```{r}
+sv.stat.all = readRDS(paste(path.satur, '01_data/sv_stat_all.rds', sep = ''))
+```
+
+
+# Plot
+```{r}
+sv.stat.all = as.data.frame(sv.stat.all)
+df <- reshape2::melt(sv.stat.all, id.vars = "n.acc")
+
+# Расчет средних значений для специальных условий
+mean_at_2 <- df %>% 
+  filter(n.acc == 2) %>% 
+  group_by(variable) %>% 
+  summarise(mean_at_2 = mean(value), .groups = "drop")
+
+mean_at_27 <- df %>% 
+  filter(n.acc == 27) %>% 
+  group_by(variable) %>% 
+  summarise(mean_at_27 = mean(value), .groups = "drop")
+
+# Объединение этих средних значений с основным набором данных
+df <- df %>% 
+  left_join(mean_at_2, by = "variable") %>% 
+  left_join(mean_at_27, by = "variable")
+
+# Расчет нормированных значений
+df <- df %>%
+  group_by(variable) %>%
+  mutate(normalized_value = (value - mean_at_2) / (mean_at_27 - mean_at_2))
+
+
+cols = colorRampPalette(colors = c('#82CD47','#66bb6a', '#3e8c4c', '#cca64e', 
+                                   '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink', '#C1A3A3', '#4F709C'),
+                        )(length(levels(df$variable)))
+names(cols) <- levels(df$variable)
+
+p = ggplot(df, aes(x = n.acc, y = normalized_value, color = variable)) +
+  # geom_jitter(alpha = 0.1, size = 1, width = 0.1) +
+  labs(title = "SVs",
+       x = "# of accessions",
+       y = "Norm cnt",
+       color = "length") +
+  scale_color_manual(values=cols,  
+                     name ='Indel Length (bp)') +
+  stat_summary(fun = mean, geom = "line", aes(group = variable), size = 0.5) +
+  # ylim(c(0, 100000)) +
+  theme_minimal()
+
+p
+
+
+pdf(paste(path.satur, '03_figures/', 'sv_saturation_len.pdf', sep = ''), width = 5, height = 3)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+
+
