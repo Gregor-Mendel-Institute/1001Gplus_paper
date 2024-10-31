@@ -39,8 +39,8 @@ catch() {
 # Main
 source activate pannagram
 
-PATH_PAN="../03_tools/pannagram/"
-PATH_DATA="../01_data/02_alignment/"
+PATH_PAN="../../03_tools/pannagram/"
+PATH_DATA="../../01_data/02_alignment/"
 
 ${PATH_PAN}inst/analys.sh \
 	-path_msa "${PATH_DATA}pannagram_v10/intermediate/consensus/" \

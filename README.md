@@ -3,6 +3,28 @@
 
 This repository contains all the scripts used to produce the data for the paper.
 
+## Structure of the repository
+
+```
+.
+├── 01_general
+├── 02_alignment
+├── 03_annotation
+├── 04_sv
+├── 05_synteny
+├── 06_snps
+├── 07_saturation
+├── 08_organellas
+├── 09_expression
+├── 10_epigenetics
+├── 11_mod_genome
+├── 12_graph
+├── 13_jbrowse2
+├── 14_repeats
+├── 15_phylogeny
+```
+
+## Structure of the DATA folder
 
 It is assumed that the initial data for the analysis is located in the data folder `../01_data/`, and the scripts, such as Pannagram, are in the folder `../03_tools/`.
 The structure of the data folder is the following:

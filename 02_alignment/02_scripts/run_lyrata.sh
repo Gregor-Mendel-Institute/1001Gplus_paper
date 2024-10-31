@@ -39,14 +39,14 @@ catch() {
 # Main
 source activate pannagram
 
-PATH_PAN="../03_tools/pannagram/"
+PATH_PAN="../../03_tools/pannagram/"
 
 ${PATH_PAN}inst/pannagram.sh \
-	-path_in "../01_assembly/01_fasta/" \
-    -path_out "../01_data/08_lyrata/pannagram_v10/" \
+	-path_in "../../01_assembly/01_fasta/" \
+    -path_out "../../01_data/08_lyrata/pannagram_v10/" \
     -nchr 5 \
     -ref MN47 \
-    -path_ref "../01_data/08_lyrata/genomes/" \
+    -path_ref "../../01_data/08_lyrata/genomes/" \
     -nchr_ref 8 \
     -cores 30 \
     -clean \

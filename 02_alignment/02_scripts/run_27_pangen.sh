@@ -39,9 +39,9 @@ catch() {
 # Main
 source activate pannagram
 
-PATH_PAN="../03_tools/pannagram/"
-PATH_ASSEMBLY="../01_assembly/01_fasta/"
-PATH_ALN="../01_data/02_alignment/"
+PATH_PAN="../../03_tools/pannagram/"
+PATH_ASSEMBLY="../../01_assembly/01_fasta/"
+PATH_ALN="../../01_data/02_alignment/"
 
 ${PATH_PAN}inst/pannagram.sh \
 	-path_in  ${PATH_ASSEMBLY} \
