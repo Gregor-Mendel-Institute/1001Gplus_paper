@@ -40,10 +40,10 @@ catch() {
 source activate pannagram
 
 PATH_WORK="../../../"
-PATH_PAN=".${PATH_WORK}03_tools/pannagram/"
+PATH_PAN="${PATH_WORK}03_tools/pannagram/"
 
 ${PATH_PAN}inst/pannagram.sh \
-	-path_in ".${PATH_WORK}01_assembly/01_fasta/" \
+	-path_in "${PATH_WORK}01_data/01_assembly/01_fasta/" \
     -path_out "${PATH_WORK}01_data/08_lyrata/pannagram_v10/" \
     -nchr 5 \
     -ref MN47 \

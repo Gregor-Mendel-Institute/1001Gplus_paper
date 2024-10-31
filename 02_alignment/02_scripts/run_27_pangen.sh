@@ -42,7 +42,7 @@ source activate pannagram
 PATH_WORK="../../../"
 PATH_PAN="${PATH_WORK}03_tools/pannagram/"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
-PATH_ASSEMBLY="${PATH_WORK}01_assembly/01_fasta/"
+PATH_ASSEMBLY="${PATH_WORK}01_data/01_assembly/01_fasta/"
 
 ${PATH_PAN}inst/pannagram.sh \
 	-path_in  ${PATH_ASSEMBLY} \
