@@ -1,0 +1,14 @@
+01_data/**
+!01_data/**/README.md
+*.pdf
+*.png
+*.pptx
+*.svg
+*.txt
+*.tsv
+*.rds
+*.xlsx
+*.fasta
+.DS_Store
+.Rhistory
+02_analysis/14_repeats/*
