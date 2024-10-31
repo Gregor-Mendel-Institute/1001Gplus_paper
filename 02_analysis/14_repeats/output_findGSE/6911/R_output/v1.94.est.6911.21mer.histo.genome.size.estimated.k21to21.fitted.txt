@@ -1,7 +1,0 @@
-size_all 167683033
-size_exl 152916178
-size_cat 150986257
-size_fit 136530655
-size_cor2 140580239
-Est. ratio of repeats 0.24542151
-Final k-mer cov 15.22963073
