@@ -9,22 +9,22 @@ The structure of the data folder is the following:
 ```
 .
 ├── 01_assembly
-│	├── 00_raw_assembly
-│	└── 01_fasta       	<- Genome .fasta files for all A.thaliana accessions
+│   ├── 00_raw_assembly
+│   └── 01_fasta       	<- Genome .fasta files for all A.thaliana accessions
 ├── 02_alignment
-│	└── pannagram_v10   <- Multiple genome alignment for A.thaliana
+│   └── pannagram_v10   <- Multiple genome alignment for A.thaliana
 ├── 03_graph
 ├── 04_annotation
-│	├── 01_raw_max
-│	├── 02_pannagram    <- Annotation groups annotation
-│	├── 03_edta
-│	└── 04_new_genes
+│   ├── 01_raw_max
+│   ├── 02_pannagram    <- Annotation groups annotation
+│   ├── 03_edta
+│   └── 04_new_genes
 ├── 05_expression
 ├── 06_methylation
 ├── 07_syri
 ├── 08_lyrata
-│	├── genomes
-│	└── pannagram_v10  <- Genome alignments for A.thaliana on A.lyrata
+│   ├── genomes
+│   └── pannagram_v10  <- Genome alignments for A.thaliana on A.lyrata
 └── 09_tair10
 ```
 
