@@ -1,0 +1,196 @@
+---
+title: "Graph of TEs"
+# output: html_notebook
+output: null_document
+---
+
+This file contains a basic pipeline for creating a graph of nestedness 
+taking into account counts of the "same" sequences (sim.cutoff).
+
+# Setup
+```{r, message=FALSE}
+library(viridis)
+library(colorRamps)
+library(gridExtra)
+library(ggplot2)
+library(ggnet)
+library(network)
+library(khroma)
+library(dplyr)
+library(igraph)
+
+source('similarity.R')
+source('graph_refinement.R')
+
+sunset <- colour("sunset")
+discrete_rainbow <- colour("discrete rainbow")
+
+sim.cutoff = 0.85
+
+```
+
+
+# Read Example
+```{r}
+
+bl.file = 'example_graph_5comp.txt'
+bl.res = read.table(bl.file, stringsAsFactors = F)
+
+i.len.field = 5
+# This is a name:
+# te|4329877|4334393|1|4517|+|AT1TE14085|ATMU4|DNA/MuDR
+# length is at the "5"-th field = 4517;
+# therefore i.len.field = 5
+
+```
+
+
+# Graph construction
+## Whole graph
+```{r}
+g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, 
+                                   i.len.field = i.len.field, collapse = T, refine = F)
+
+g.part <- network(g.content.comp$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+set.seed(239)
+p.init <- ggnet2(g.part, label = F, edge.color = "black",
+            # node.size = g.nodes.cnt[b.graph.names],
+            node.size = 1,
+            color = '#468B97',
+            arrow.gap = 0.01, arrow.size = 2,
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
+```
+
+## Refined graph
+```{r}
+g.content.comp = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, i.len.field = i.len.field, collapse = T)
+
+g.part <- network(g.content.comp$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+set.seed(239)
+p.refined <- ggnet2(g.part, label = F, edge.color = "black",
+            # node.size = g.nodes.cnt[b.graph.names],
+            node.size = 1,
+            color = '#468B97',
+            arrow.gap = 0.01, arrow.size = 2,
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
+
+```
+
+## Plot
+```{r}
+p.init
+p.refined
+
+```
+
+# Stop
+```{r}
+stop('Script in progress...')
+```
+
+
+# Traits
+```{r}
+g.nodes.cnt = nodes.cnt$cnt
+names(g.nodes.cnt) = nodes.cnt$node
+
+b.graph.init = b.graph
+
+g.part <- network(b.graph, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+
+p <- ggnet2(g.part, label = F, edge.color = "black",
+            node.size = g.nodes.cnt[b.graph.names],
+            color = '#468B97'
+            # color = g.nodes.fam[b.graph.names],
+            # palette = fam.palette,
+            # mode = "kamadakawai"
+            )
+p
+
+
+```
+
+# Output
+```{r}
+
+# nodes:
+head(nodes)
+
+# edges:
+head(b.graph)
+
+# Connected components
+final.graph <- igraph::make_graph(t(b.graph), directed = T)
+final.graph <- igraph::simplify(final.graph)
+final.graph.comp <- igraph::components(final.graph)
+
+# memnership
+head(final.graph.comp$membership, 100)
+
+```
+
+
+# Jilong example
+```{r}
+path.jilong = '/Users/anna/Library/CloudStorage/OneDrive-Personal/vienn/jilong/' 
+
+
+bl.file = paste(path.jilong, 'blast_to_anna.txt', sep = '')
+bl.res = read.table(bl.file, stringsAsFactors = F)
+
+sim.cutoff = 0.85
+i.len.field = 7
+
+# Run nestedness
+g.content = getGraphFromBlast(bl.res, sim.cutoff = sim.cutoff, i.len.field = i.len.field, collapse = T,
+                              min.length = 1000, max.length = 10000)
+g.comp = getGraphComponents(g.content$edges)
+
+# See sizes
+g.comp$csize
+
+# Define new traits
+seqs.species = sapply(g.content$nodes$name, function(s) strsplit(s, '\\|')[[1]][1])
+new.trait = traitsSeqToNode(g.content$nodes, seqs.species)
+g.content$nodes.traits$species = new.trait[g.content$nodes.traits$node]
+
+# Define colors
+colors.trait = discrete_rainbow(length(unique(new.trait)))
+names(colors.trait) = unique(new.trait)
+colors.trait['Mix'] = 'blue'
+
+# plot
+g.part <- network(g.content$edges, matrix.type = "edgelist", ignore.eval = FALSE, directed = TRUE)
+b.graph.names = network.vertex.names(g.part)
+set.seed(239)
+p.refined <- ggnet2(g.part, label = F, edge.color = "black",
+            node.size = g.content$nodes.traits[b.graph.names,]$cnt,
+            # node.size = 0.1,
+            # color = '#468B97',
+            arrow.gap = 0.01, arrow.size = 2,
+            color = new.trait[b.graph.names],
+            palette = colors.trait,
+            # mode = "kamadakawai"
+            )
+
+p.refined
+
+```
+
+
+
+
+
+
+
+
+
