@@ -38,11 +38,11 @@ catch() {
 # ------------------------------------
 # Main
 source activate pannagram
-
-PATH_PAN="../../03_tools/pannagram/"
-PATH_DATA="../../01_data/02_alignment/"
+PATH_WORK="../../../"
+PATH_PAN="${PATH_WORK}03_tools/pannagram/"
+PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 
 ${PATH_PAN}inst/analys.sh \
-	-path_msa "${PATH_DATA}pannagram_v10/intermediate/consensus/" \
-    -path_chr "${PATH_DATA}pannagram_v10/intermediate/chromosomes/" \
+	-path_msa "${PATH_ALN}pannagram_v10/intermediate/consensus/" \
+    -path_chr "${PATH_ALN}pannagram_v10/intermediate/chromosomes/" \
     -blocks -seq -sv -sv_graph
