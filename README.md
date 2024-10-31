@@ -1,5 +1,41 @@
 # 1001Gplus_paper
 
+
+This repository contains all the scripts used to produce the data for the paper.
+
+
+It is assumed that the initial data for the analysis is located in the data folder `../01_data/`, and the scripts, such as Pannagram, are in the folder `../03_tools/`.
+The structure of the data folder is the following:
+```
+.
+├── 01_assembly
+│	├── 00_raw_assembly
+│	└── 01_fasta       	<- Genome .fasta files for all A.thaliana accessions
+├── 02_alignment
+│	└── pannagram_v10   <- Multiple genome alignment for A.thaliana
+├── 03_graph
+├── 04_annotation
+│	├── 01_raw_max
+│	├── 02_pannagram    <- Annotation groups annotation
+│	├── 03_edta
+│	└── 04_new_genes
+├── 05_expression
+├── 06_methylation
+├── 07_syri
+├── 08_lyrata
+│	├── genomes
+│	└── pannagram_v10  <- Genome alignments for A.thaliana on A.lyrata
+└── 09_tair10
+```
+
+
+
+## Important comments
+* Reconstructed 22001 is called 220011
+* ..
+
+
+
 ## Create folders
 If you want to create an analysis folder, you can use the script utils/create_directories.sh:
 
@@ -8,21 +44,3 @@ If you want to create an analysis folder, you can use the script utils/create_di
 ```
 
 The structure of the folder will be automatically created.
-
-
-## Commit scripts and figures
-
-```
-cd 02_analysis
-find . -type d -name '02_scripts' -exec git add {} +
-find . -type d -name '03_figures' -exec git add {} +
-git commit -m "scripts and figures updated"
-git push
-```
-
-
-## Important comments to share
-* Reconstructed 22001 is called 220011
-* ..
-
-
