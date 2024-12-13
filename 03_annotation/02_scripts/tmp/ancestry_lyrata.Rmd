@@ -1,0 +1,168 @@
+---
+title: "Ancestral Lyrata"
+output: null_document
+---
+
+
+
+# Setup
+```{r}
+library(pannagram)
+library(rhdf5)
+
+gr.accs.e <- "accs/"
+gr.accs.b <- "/accs"
+gr.break.e = 'break/'
+gr.break.b = '/break'
+
+```
+
+
+## Paths
+```{r}
+path.msa = '/Volumes/Samsung_T5/vienn/test/a27/intermediate/consensus2/'
+path.prev = '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus/01_data/04_annotation/02_pannagram/genes_v05/'
+
+path.lyrata = '/Volumes/Samsung_T5/vienn/test/a27/intermediate/lyrata/'
+
+```
+
+```{r}
+s.combs.init = c('1_1', '1_2', '2_3', '2_4', '3_3', '3_5', '4_6', '4_7', '5_6', '5_7', '5_8')
+
+s.combs <- strsplit(s.combs.init, "_")
+s.combs <- data.frame(do.call(rbind, s.combs))
+s.combs$s = s.combs.init
+
+s.combs
+
+
+```
+
+
+```{r}
+gff.new.own = read.table(paste0(path.msa, 'gff_own.gff'), 
+                         stringsAsFactors = F)
+
+
+accessions = unique(gff.new.own$V1)
+accessions = sapply(accessions, function(s) strsplit(s, '_')[[1]][1])
+accessions = unique(accessions)
+length(accessions)
+```
+
+
+```{r}
+gff.new.own = gff.new.own[gff.new.own$V3 == 'mRNA',]
+gff.new.own$cov = 0
+gff.new.own$s.comb = ''
+for(i.chr in 1:5){
+  pokaz('Chromosome', i.chr)
+  lyrata.comb = s.combs$s[s.combs$X1 == i.chr]
+  
+  for(s.c in lyrata.comb){
+    
+    pokaz('Comb', s.c)
+    
+    file = paste0(path.lyrata, 'ref_', s.c, '_MN47.h5')
+    v0 = h5read(file, paste(gr.accs.e, 'MN47', sep = ''))
+    v0 = abs(v0)
+    
+    for(acc in accessions){
+      pokaz('Accession', acc)
+      if(acc == '220011'){
+        v1 = h5read(file, paste(gr.accs.e, '22001_mod', sep = ''))  
+      }else {
+        v1 = h5read(file, paste(gr.accs.e, acc, sep = ''))  
+      }
+      
+      v1 = abs(v1)
+      
+      idx.y = grep(paste0(acc, '_Chr', i.chr), gff.new.own$V1)
+      y.init = gff.new.own[grep(paste0(acc, '_Chr', i.chr), gff.new.own$V1),]
+      
+      v = cbind(v1, v0)
+      
+      max.chr.len = max(nrow(v), max(abs(v[!is.na(v)])))
+    
+      v = v[v[,1]!=0,]
+      v = v[!is.na(v[,1]),]
+      v = v[!is.na(v[,2]),]
+      idx.v.neg = which(v[,1] < 0)
+      if(length(idx.v.neg) > 0){
+        v[idx.v.neg,] = v[idx.v.neg,] * (-1)
+      }
+      
+      # Get correspondence between two accessions
+      v.corr = rep(0, max.chr.len)
+      v.corr[v[,1]] = v[,2]
+      
+      pokaz('Loop')
+      for(irow in 1:nrow(y.init)){
+        value = mean(v.corr[y.init$V4[irow]:y.init$V5[irow]] > 0)
+        if(is.na(value)) next
+        
+        if(value > y.init$cov[irow]){
+          y.init$cov[irow] = value
+          y.init$s.comb[irow] = s.c
+        }
+        
+      }
+      
+      gff.new.own$cov[idx.y] = y.init$cov
+      gff.new.own$s.comb[idx.y] = y.init$s.comb
+    }
+  }
+}
+
+saveRDS(gff.new.own, '/Volumes/Samsung_T5/vienn/test/a27/intermediate/consensus2/gff_own_coverage_lyrata.rds')
+```
+
+
+```{r}
+library(ggplot2)
+
+
+data <- data.frame(value = rnorm(1000, mean = 50, sd = 10))
+
+# Создание гистограммы
+histogram <- ggplot(data, aes(x = value)) +
+  geom_histogram(binwidth = 2, fill = "steelblue", color = "black", alpha = 0.8) +
+  labs(
+    title = "Гистограмма распределения значений",
+    x = "Значение",
+    y = "Частота"
+  )
+```
+
+
+```{r}
+hist(gff.new.own$cov)
+
+gff.new.own$group = sapply(gff.new.own$V9, function(s) strsplit(s, '\\.')[[1]][1])
+
+gr.max.cov =  tapply(gff.new.own$cov, gff.new.own$group, max)
+
+hist(gr.max.cov)
+
+```
+# Analysis of results
+```{r}
+
+df = read.table('/Volumes/Samsung_T5/vienn/test/a27/test/lyrata_res.txt', stringsAsFactors = F)
+df = df[!is.na(df$V4),]
+
+
+df$comb = paste(df$V3, df$V2, df$V5, sep  = '|')
+
+x = tapply(df$V4, df$comb, max)
+
+x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
+x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
+
+
+setdiff(row)
+
+
+```
+

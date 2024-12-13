@@ -1,0 +1,292 @@
+---
+title: "R Notebook"
+output: null_document
+---
+
+# Setup
+```{r}
+
+library(rhdf5)
+library(crayon)
+library(pannagram)
+
+```
+
+## Paths
+```{r}
+
+aln.type = 'extra2_'
+path.msa = '/Volumes/Samsung_T5/vienn/test/a27/annot5/'
+
+path.annotation = '/Volumes/Samsung_T5/vienn/test/a27/annot5/annotation/'
+path.genes = '/Volumes/Samsung_T5/vienn/test/a27/annot5/annotation/'
+file.ref.ann = '/Volumes/Samsung_T5/vienn/tair/gff/TAIR10_GFF3_genes.gff'
+
+
+path.own.tmp = '/Volumes/Samsung_T5/vienn/test/a27/annot5/annotation_own/'
+
+```
+
+# Read data
+```{r}
+gff.tair = read.table(file.ref.ann, stringsAsFactors = F)
+gff.tair = gff.tair[gff.tair$V3 == 'gene',]
+head(gff.tair)
+pokaz('Number of genes', nrow(gff.tair))
+```
+
+## TAIR10 -> pangenome coordinate
+
+```{r}
+gff2 = gff2gff(path.msa, acc1 = '0', acc2 = 'pangen', gff1 = gff.tair, n.chr = 5, exact.match = F, aln.type = aln.type,s.chr = 'Chr')
+gff2.init = gff2
+```
+
+### Feature extraction
+```{r}
+
+pokaz('Number of genes', nrow(gff2))
+
+head(gff2)
+head(gff.tair)
+
+gff2$chr = as.numeric(gsub('Chr', '', gff2$V1))
+gff2$gr = sapply(gff2$V9, function(s) strsplit(s, ';')[[1]][1])
+
+gff2$gr = gsub('ID=', '', gff2$gr)
+
+max(nchar(gff2$gr))
+min(nchar(gff2$gr))
+
+
+gff2$note = sapply(gff2$V9, function(s) strsplit(s, ';')[[1]][2])
+gff2 = gff2[gff2$note == "Note=protein_coding_gene",]
+
+
+```
+
+
+# Read the pangenome annotation
+```{r}
+gff.pan.all = read.table(paste0(path.msa,'gff_pan.gff'),
+                         stringsAsFactors = F)
+```
+
+## Get genes only
+```{r}
+idx.mrna = gff.pan.all$V3 == 'mRNA'
+gff.pan = gff.pan.all[idx.mrna,]
+gff.pan$gr = sapply(gff.pan$V9, function(s) strsplit(s, '\\.')[[1]][1])
+gff.pan$gr = gsub('ID=', '',gff.pan$gr)
+
+gff.pan$V9 = paste0(gff.pan$V9, ';Parent=', gff.pan$gr)
+gff.pan.all$V9[idx.mrna] = gff.pan$V9
+
+max(nchar(gff.pan$gr))
+
+df.pangen = data.frame(beg = tapply(gff.pan$V4, gff.pan$gr, min),
+                       end = tapply(gff.pan$V5, gff.pan$gr, max),
+                       strand = tapply(gff.pan$V7, gff.pan$gr, unique))
+df.pangen$gr = row.names(df.pangen)
+df.pangen$chr = as.numeric(substr(df.pangen$gr, 3, 3))
+
+
+
+```
+
+# Add tair10 to pangenome gff
+```{r}
+
+tair10.used = c()
+
+df.pangen$tair = ''
+df.pangen$tair.n = 0
+for(i.chr in 1:5){
+  for(i.s in c('-', '+')){
+    pokaz(i.chr, i.s)
+    idx = which((df.pangen$strand == i.s) & (df.pangen$chr == i.chr))
+    df.tmp = df.pangen[idx,]
+    
+    gff2.tmp = gff2[(gff2$V7 == i.s) & (gff2$chr == i.chr),]
+    pos = rep(0, max(max(df.tmp$end), max(gff2.tmp$V5)))
+    
+    for(irow in 1:nrow(gff2.tmp)){
+      pos[gff2.tmp$V4[irow]:gff2.tmp$V5[irow]] = irow
+    }
+    
+    for(irow in 1:nrow(df.tmp)){
+      p = unique(pos[df.tmp$beg[irow]:df.tmp$end[irow]])
+      p = setdiff(p, 0)
+      if(length(p) == 0) next
+      tair10.used = c(tair10.used, gff2.tmp$gr[p])  
+      tmp.names = paste0(gff2.tmp$gr[p], collapse = ',')
+      df.tmp$tair[irow] = tmp.names
+      df.tmp$tair.n[irow] = length(p)
+    }
+    
+    df.pangen$tair[idx] = df.tmp$tair
+    df.pangen$tair.n[idx] = df.tmp$tair.n
+    
+  }
+}
+
+df.pangen = df.pangen[order(df.pangen$beg),]
+df.pangen = df.pangen[order(df.pangen$chr),]
+
+
+df.pangen$tair.name = paste0(';Name=', df.pangen$tair)
+df.pangen$tair.name[df.pangen$tair.n == 0] = ''
+df.pangen$name = paste0('ID=', df.pangen$gr,df.pangen$tair.name)
+
+tair10.used = unique(tair10.used)
+
+gff2.add = gff2[!(gff2$gr %in% tair10.used),]
+
+dim(gff2.add)
+
+
+df.genes.new = data.frame(V1 = paste0('Pannagram_Chr', df.pangen$chr),
+                          V2 = 'Pannagram',
+                          V3 = 'gene',
+                          V4 = df.pangen$beg,
+                          V5 = df.pangen$end,
+                          V6 = '.',
+                          V7 = df.pangen$strand,
+                          V8 = '.',
+                          V9 = df.pangen$name)
+
+df.genes.tair = data.frame(V1 = paste0('Pannagram_Chr', gff2.add$chr),
+                           V2 = 'Pan_tair10',
+                           V3 = 'gene',
+                           V4 = gff2.add$V4,
+                           V5 = gff2.add$V5,
+                           V6 = '.',
+                           V7 = gff2.add$V7,
+                           V8 = '.',
+                           V9 = paste0("ID=", gff2.add$gr, ";Name=", gff2.add$gr))
+
+gff.new = rbind(df.genes.new, df.genes.tair)
+
+gff.new = gff.new[order(gff.new$V4),]
+gff.new = gff.new[order(gff.new$V1),]
+
+
+```
+
+# Introduce genes back to the gff-annotation
+```{r}
+
+
+gff.all = rbind(gff.new, gff.pan.all)
+
+gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+gff.all$gr = gsub('ID=', '',gff.all$gr)
+
+gr.pos = tapply(gff.all$V4, gff.all$gr, min)
+
+gff.all$pos = gr.pos[gff.all$gr]
+
+
+gff.all = gff.all[order(gff.all$pos),]
+gff.all = gff.all[order(gff.all$V1),]
+
+write.table(gff.all[,1:9], file = paste0(path.own.tmp, 'gff_pannagram.gff'), row.names = F, col.names = F, quote = F, sep = '\t')
+
+
+```
+
+
+# From pancoordinate to own genomes
+
+```{r}
+saveRDS(gff.new, paste0(path.own.tmp, 'gff_genes_only.gff'))
+```
+
+
+```{r}
+
+accessions = c('0', "10002", "10015", "10024", "1741", "22001_mod", "22002", "22003", "22004", 
+                    "22005", "22006", "22007", "6024", "6069", "6124", "6244", "6909", 
+                    "6966", "8236", "9075", "9537", "9543", "9638", "9728", "9764", 
+                    "9888", "9905", "9981")
+
+for(acc in accessions[-1]){
+  pokaz(acc)
+  gff.acc = gff2gff(path.msa, acc1 = 'Pannagram', acc2 = acc, gff1 = gff.new, n.chr = 5, exact.match = F, aln.type = aln.type, 
+                    s.chr = '_Chr')
+  saveRDS(gff.acc, paste0(path.own.tmp, 'gff_', acc, '.rds'))
+}
+
+
+```
+# Combine
+
+## Read own
+```{r}
+gff.own = read.table('/Volumes/Samsung_T5/vienn/test/a27/annot5/gff_own.gff', stringsAsFactors = F)
+
+```
+
+
+```{r}
+
+
+acc = '10002'
+
+gff.own.acc = gff.own[grep(acc, gff.own$V1),]
+
+gff.genes.acc = readRDS(paste0('/Volumes/Samsung_T5/vienn/test/a27/annot5/annotation_own/tmp/', 'gff_', acc, '.rds'))
+
+gff.genes.acc$V9 = sapply(gff.genes.acc$V9, function(s) strsplit(s, ';len')[[1]][1])
+
+gff.all = rbind(gff.genes.acc, gff.own.acc)
+
+gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+gff.all$gr = gsub('ID=', '',gff.all$gr)
+
+gr.pos = tapply(gff.all$V4, gff.all$gr, min)
+
+gff.all$pos = gr.pos[gff.all$gr]
+
+
+gff.all = gff.all[order(gff.all$pos),]
+gff.all = gff.all[order(gff.all$V1),]
+
+xx = tapply(gff.all$V7[gff.all$V3 != 'mRNA'], gff.all$gr[gff.all$V3 != 'mRNA'], function(s) length(unique(s)))
+
+
+write.table(gff.all[,1:9], file = paste0(path.own.tmp, 'gff_pannagram.gff'), row.names = F, col.names = F, quote = F, sep = '\t')
+
+
+
+gff.all[gff.all$gr == 'AT3Gr10002674',]
+
+```
+
+# Checkup
+```{r}
+
+for(acc in accessions){
+  
+  gff.all = read.table(paste0('/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus/01_data/04_annotation/02_pannagram/genes_v06_pre/gff_',acc,'.gff'), stringsAsFactors = F)
+  
+  gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+  gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+  gff.all$gr = gsub('ID=', '',gff.all$gr)
+  
+  
+  xx = tapply(gff.all$V7, gff.all$gr, function(s) length(unique(s)))
+  
+  idx.confusing = which(xx > 1)
+  pokaz(acc, 'Number of confusing genes', length(idx.confusing), names(idx.confusing))
+}
+
+
+max(xx)
+
+```
+
+
+
