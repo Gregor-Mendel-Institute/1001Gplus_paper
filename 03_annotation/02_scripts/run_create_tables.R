@@ -101,46 +101,62 @@ file.pan.merged = paste0(path.annotation, 'gff_pan_merged.gff')
 # df.tot[names(x.mrna),'mrna'] = x.mrna
 # 
 # write.table(df.tot, paste0(path.features, 'lyrata_coverage.txt'), sep = '\t', quote = F)
+# 
+# # ***********************************************************************
+# # ---- mRNA on TEs ----
+# pokaz('* TEs')
+# 
+# cl <- makeCluster(30)
+# registerDoParallel(cl)
+# df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
+#   
+#   file.res = paste0(path.simsearch, 'out_temrnas_', acc, '/simsearch.tair10_tes.rds')
+#   x = readRDS(file.res)
+# 
+#   x$cov = x$C1 / x$len1
+#   
+#   x$acc = sapply(x$V1, function(s) strsplit(s, '\\|')[[1]][1])
+#   
+#   y = tapply(x$cov, x$acc, max)
+#   
+#   df.acc = data.frame(gr = paste(names(y), acc, sep = '.'), group = names(y), acc = acc, cov = y)
+#   return(df.acc)
+# }
+# stopCluster(cl)
+# 
+# # save(list = ls(), file = "tmp_workspace_counts.RData")
+# 
+# df = df[order(df$gr),]
+# rownames(df) = NULL
+# write.table(df, paste0(path.features, 'te_coverage_mrna.txt'), sep = '\t', quote = F, row.names = F)
+# 
+# df.stat = data.frame(mean = tapply(df$cov, df$group, mean), max = tapply(df$cov, df$group, max))
+# df.stat$group = rownames(df.stat)
+# df.stat$is.te = (df.stat$max >= 0.5) * 1
+# 
+# write.table(df.stat[,c(3,1,2, 4)], paste0(path.features, 'te_coverage_mrna_stat.txt'), sep = '\t', quote = F, row.names = F)
+
 
 # ***********************************************************************
-# ---- mRNA on TEs ----
-pokaz('* TEs')
+# ---- mRNA on mRNA ----
+pokaz('* mRNA on mRNA')
+
+cov.cutoff = 0.85
 
 cl <- makeCluster(30)
 registerDoParallel(cl)
 df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
   
-  file.res = paste0(path.simsearch, 'out_temrnas_', acc, '/simsearch.tair10_tes.rds')
+  file.res = paste0(path.simsearch, 'out_mrnas_', acc, '/simsearch.mrnas.rds')
   x = readRDS(file.res)
-
-  x$cov = x$C1 / x$len1
   
-  x$acc = sapply(x$V1, function(s) strsplit(s, '\\|')[[1]][1])
+  x = x[(x$p1 > cov.cutoff) & (x$p8 > cov.cutoff),]
   
-  y = tapply(x$cov, x$acc, max)
-  
-  df.acc = data.frame(gr = paste(names(y), acc, sep = '.'), group = names(y), acc = acc, cov = y)
-  return(df.acc)
+  return(x[, c('V1', 'V8')])
 }
 stopCluster(cl)
 
 save(list = ls(), file = "tmp_workspace_counts.RData")
-
-df = df[order(df$gr),]
-rownames(df) = NULL
-write.table(df, paste0(path.features, 'te_coverage_mrna.txt'), sep = '\t', quote = F, row.names = F)
-
-df.stat = data.frame(mean = tapply(df$cov, df$group, mean), max = tapply(df$cov, df$group, max))
-df.stat$group = rownames(df.stat)
-
-write.table(df.stat[,c(3,1,2)], paste0(path.features, 'te_coverage_mrna_stat.txt'), sep = '\t', quote = F, row.names = F)
-
-
-# ***********************************************************************
-# ---- mRNA on mRNA ----
-
-
-
 
 
 # ***********************************************************************
