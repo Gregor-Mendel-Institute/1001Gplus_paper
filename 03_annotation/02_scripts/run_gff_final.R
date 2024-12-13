@@ -395,62 +395,62 @@ initial.vars <- ls()
 # ---- Get mRNA and Gene sequences ----
 pokaz('* Get sequences')
 
-cl <- makeCluster(numCores)
-registerDoParallel(cl)
-
-tmp <- foreach(acc = accessions.true, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
-# for(acc in accessions.true) {
-  
-  file.fasta.genes = paste0(path.fasta, 'genes_',acc,'.fasta')
-  file.fasta.mrnas = paste0(path.fasta, 'mrnas_',acc,'.fasta')
-  
-  write("", file = file.fasta.genes)
-  write("", file = file.fasta.mrnas)
-  
-  pokaz(acc)
-
-  file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
-
-  gff.all = read.table(file.own.merged, stringsAsFactors = F)
-  gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-  gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-  gff.all$gr = gsub('ID=', '',gff.all$gr)
-
-  gff.all$name = paste(gff.all$gr, acc, gff.all$V3, gff.all$V4, gff.all$V5, gff.all$V7, gff.all$V5 -  gff.all$V4 + 1, sep = '|')
-
-  for(i.chr in 1:5){
-    if(acc == '220011'){
-      s.chr = seq2nt(readFasta(paste0(path.chr, '22001_mod', '_chr', i.chr, '.fasta')))
-    } else {
-      s.chr = seq2nt(readFasta(paste0(path.chr, acc, '_chr', i.chr, '.fasta')))
-    }
-
-    for(s.type in c('gene', 'mRNA')){
-      pokaz(i.chr, s.type)
-
-      # save(list = ls(), file = "tmp_workspace_annotation.RData")
-
-      gff.tmp = gff.all[(gff.all$V3 == s.type) & (gff.all$V1 == paste0(acc, '_Chr', i.chr)),]
-      if(nrow(gff.tmp) == 0) next
-
-      seqs = c()
-      for(irow in 1:nrow(gff.tmp)){
-        seqs = c(seqs, nt2seq(s.chr[gff.tmp$V4[irow]:gff.tmp$V5[irow]]))
-      }
-      names(seqs) = gff.tmp$name
-
-      if(s.type == 'gene'){
-        writeFasta(seqs, file.fasta.genes, append = T)
-      } else {
-        writeFasta(seqs, file.fasta.mrnas, append = T)
-      }
-
-    }
-  }
-
-}
-
-stopCluster(cl)
+# cl <- makeCluster(numCores)
+# registerDoParallel(cl)
+#
+# tmp <- foreach(acc = accessions.true, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
+# # for(acc in accessions.true) {
+#   
+#   file.fasta.genes = paste0(path.fasta, 'genes_',acc,'.fasta')
+#   file.fasta.mrnas = paste0(path.fasta, 'mrnas_',acc,'.fasta')
+#   
+#   write("", file = file.fasta.genes)
+#   write("", file = file.fasta.mrnas)
+#   
+#   pokaz(acc)
+# 
+#   file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
+# 
+#   gff.all = read.table(file.own.merged, stringsAsFactors = F)
+#   gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+#   gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+#   gff.all$gr = gsub('ID=', '',gff.all$gr)
+# 
+#   gff.all$name = paste(gff.all$gr, acc, gff.all$V3, gff.all$V4, gff.all$V5, gff.all$V7, gff.all$V5 -  gff.all$V4 + 1, sep = '|')
+# 
+#   for(i.chr in 1:5){
+#     if(acc == '220011'){
+#       s.chr = seq2nt(readFasta(paste0(path.chr, '22001_mod', '_chr', i.chr, '.fasta')))
+#     } else {
+#       s.chr = seq2nt(readFasta(paste0(path.chr, acc, '_chr', i.chr, '.fasta')))
+#     }
+# 
+#     for(s.type in c('gene', 'mRNA')){
+#       pokaz(i.chr, s.type)
+# 
+#       # save(list = ls(), file = "tmp_workspace_annotation.RData")
+# 
+#       gff.tmp = gff.all[(gff.all$V3 == s.type) & (gff.all$V1 == paste0(acc, '_Chr', i.chr)),]
+#       if(nrow(gff.tmp) == 0) next
+# 
+#       seqs = c()
+#       for(irow in 1:nrow(gff.tmp)){
+#         seqs = c(seqs, nt2seq(s.chr[gff.tmp$V4[irow]:gff.tmp$V5[irow]]))
+#       }
+#       names(seqs) = gff.tmp$name
+# 
+#       if(s.type == 'gene'){
+#         writeFasta(seqs, file.fasta.genes, append = T)
+#       } else {
+#         writeFasta(seqs, file.fasta.mrnas, append = T)
+#       }
+# 
+#     }
+#   }
+# 
+# }
+# 
+# stopCluster(cl)
 
 # Combine to a common file:
 
@@ -466,10 +466,10 @@ for(acc in accessions) {
   file.fasta.mrnas.acc = paste0(path.fasta, 'mrnas_',acc,'.fasta')
   
   if (file.exists(file.fasta.genes.acc)) {
-    writeLines(readLines(file.fasta.genes.acc), con = file.fasta.genes, append = TRUE)
+    cat(readLines(file.fasta.genes.acc), file = file.fasta.genes, sep = "\n", append = TRUE)
   }
   if (file.exists(file.fasta.mrnas.acc)) {
-    writeLines(readLines(file.fasta.mrnas.acc), con = file.fasta.mrnas, append = TRUE)
+    cat(readLines(file.fasta.mrnas.acc), file = file.fasta.mrnas, sep = "\n", append = TRUE)
   }
   
 }
