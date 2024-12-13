@@ -61,7 +61,16 @@ stopCluster(cl)
 cnt.genes = table(df$gr[df$type == 'gene'], df$acc[df$type == 'gene'])
 cnt.mrnas = table(df$gr[df$type == 'mRNA'], df$acc[df$type == 'mRNA'])
 
+save(list = ls(), file = "tmp_workspace_counts.RData")
+
 write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
+write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
+
+
+
+
+write.table(cnt.genes, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
+
 
 
 # ***********************************************************************
