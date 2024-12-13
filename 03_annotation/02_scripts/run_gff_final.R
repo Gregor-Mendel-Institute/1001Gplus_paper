@@ -454,25 +454,26 @@ pokaz('* Get sequences')
 
 # Combine to a common file:
 
-file.fasta.genes = paste0(path.fasta, 'genes.fasta')
-file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
-
-write("", file = file.fasta.genes)
-write("", file = file.fasta.mrnas)
-
-for(acc in accessions) {
-  
-  file.fasta.genes.acc = paste0(path.fasta, 'genes_',acc,'.fasta')
-  file.fasta.mrnas.acc = paste0(path.fasta, 'mrnas_',acc,'.fasta')
-  
-  if (file.exists(file.fasta.genes.acc)) {
-    cat(readLines(file.fasta.genes.acc), file = file.fasta.genes, sep = "\n", append = TRUE)
-  }
-  if (file.exists(file.fasta.mrnas.acc)) {
-    cat(readLines(file.fasta.mrnas.acc), file = file.fasta.mrnas, sep = "\n", append = TRUE)
-  }
-  
-}
+# file.fasta.genes = paste0(path.fasta, 'genes.fasta')
+# file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
+# 
+# write("", file = file.fasta.genes)
+# write("", file = file.fasta.mrnas)
+# 
+# for(acc in accessions) {
+#   pokaz('Accession', acc)
+#   
+#   file.fasta.genes.acc = paste0(path.fasta, 'genes_',acc,'.fasta')
+#   file.fasta.mrnas.acc = paste0(path.fasta, 'mrnas_',acc,'.fasta')
+#   
+#   if (file.exists(file.fasta.genes.acc)) {
+#     cat(readLines(file.fasta.genes.acc), file = file.fasta.genes, sep = "\n", append = TRUE)
+#   }
+#   if (file.exists(file.fasta.mrnas.acc)) {
+#     cat(readLines(file.fasta.mrnas.acc), file = file.fasta.mrnas, sep = "\n", append = TRUE)
+#   }
+#   
+# }
 
 # stop('Done')
 
@@ -489,7 +490,11 @@ s.combs <- strsplit(s.comb.lyrata, "_")
 s.combs <- data.frame(do.call(rbind, s.combs))
 s.combs$s = s.comb.lyrata
 
-for(acc in accessions.true){
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
+# for(acc in accessions.true){
   pokaz('Accession', acc)
 
   file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
@@ -500,6 +505,8 @@ for(acc in accessions.true){
   gff.all$gr = gsub('ID=', '',gff.all$gr)
   gff.all.all = gff.all
 
+  accession_results <- list()
+  
   for(i.chr in 1:5){
     pokaz('Chromosome', i.chr)
 
@@ -545,11 +552,17 @@ for(acc in accessions.true){
       }
 
       df.lyrata = data.frame(comb = s.c, acc = acc, gr = gff.all$gr, cov = lyrata.cov, type = gff.all$V3)
-
-      write.table(df.lyrata, file.lyrata.res, append = T, row.names = F, col.names = F, sep = '\t', quote = F)
+  
+      # write.table(df.lyrata, file.lyrata.res, append = T, row.names = F, col.names = F, sep = '\t', quote = F)
+      accession_results <- append(accession_results, list(df.lyrata))
     }
   }
+  return(accession_results)
 }
+
+stopCluster(cl)
+
+write.table(results, file.lyrata.res, row.names = FALSE, col.names = TRUE, sep = '\t', quote = FALSE)
 
 
 
