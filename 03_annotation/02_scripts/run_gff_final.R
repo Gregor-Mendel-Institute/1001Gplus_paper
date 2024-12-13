@@ -307,95 +307,98 @@ initial.vars <- ls()
 # 
 #   return(NULL)
 # }
-
-# ***********************************************************************
-# ---- Confusing genes ----
-pokaz('* Confusing genes')
-
-file.gene.confusing = paste0(path.ann.tmp, 'idx_confusing.rds')
-
-if(!file.exists(file.gene.confusing)){
-  gene.confusing = c()
-  for(acc in accessions){
-    
-    if(acc == '22001_mod'){
-      file.own.merged = paste0(path.ann.own, 'gff_', '220011', '.gff')
-    } else {
-      file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')  
-    }
-    
-    gff.all = read.table(file.own.merged, stringsAsFactors = F)
-    
-    gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-    gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-    gff.all$gr = gsub('ID=', '',gff.all$gr)
-    
-    
-    cnt.strand = tapply(gff.all$V7, gff.all$gr, function(s) length(unique(s)))
-    idx.confusing = which(cnt.strand > 1)
-    gene.confusing = unique(c(gene.confusing, names(idx.confusing)))
-    
-    pokaz(acc, 'Number of confusing genes', length(idx.confusing), 'Total number of confusing', length(gene.confusing))
-  }
-  
-  # Save
-  saveRDS(gene.confusing, file.gene.confusing)
-} else {
-  gene.confusing = readRDS(file.gene.confusing)
-}
-
-
-# ***********************************************************************
-# ---- Remove confusing genes from all of the files ----
-pokaz('* Remove confusing genes from own')
-for(acc in accessions){
-  pokaz('Accession', acc)
-
-  if(acc == '22001_mod'){
-    file.own.merged = paste0(path.ann.own, 'gff_', '220011', '.gff')
-  } else {
-    file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
-  }
-
-  gff.all = read.table(file.own.merged, stringsAsFactors = F)
-  gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-  gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-  gff.all$gr = gsub('ID=', '',gff.all$gr)
-
-  pokaz('Before', nrow(gff.all))
-  gff.all = gff.all[!(gff.all$gr %in% gene.confusing),]
-  pokaz('After', nrow(gff.all))
-
-  # Save
-  options(scipen = 999)
-  write.table(gff.all[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t')
-  options(scipen = 0)
-
-}
-
-
-# Remove from the pangenome annotation
-pokaz('* Remove confusing genes from pangenome')
-
-gff.all = read.table(file.pan.merged, stringsAsFactors = F)
-gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-gff.all$gr = gsub('ID=', '',gff.all$gr)
-
-pokaz('Before', nrow(gff.all))
-gff.all = gff.all[!(gff.all$gr %in% gene.confusing),]
-pokaz('After', nrow(gff.all))
-
-options(scipen = 999)
-write.table(gff.all[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t')
-options(scipen = 0)
+# stopCluster(cl)
+# 
+# # ***********************************************************************
+# # ---- Confusing genes ----
+# pokaz('* Confusing genes')
+# 
+# file.gene.confusing = paste0(path.ann.tmp, 'idx_confusing.rds')
+# 
+# if(!file.exists(file.gene.confusing)){
+#   gene.confusing = c()
+#   for(acc in accessions){
+#     
+#     if(acc == '22001_mod'){
+#       file.own.merged = paste0(path.ann.own, 'gff_', '220011', '.gff')
+#     } else {
+#       file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')  
+#     }
+#     
+#     gff.all = read.table(file.own.merged, stringsAsFactors = F)
+#     
+#     gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+#     gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+#     gff.all$gr = gsub('ID=', '',gff.all$gr)
+#     
+#     
+#     cnt.strand = tapply(gff.all$V7, gff.all$gr, function(s) length(unique(s)))
+#     idx.confusing = which(cnt.strand > 1)
+#     gene.confusing = unique(c(gene.confusing, names(idx.confusing)))
+#     
+#     pokaz(acc, 'Number of confusing genes', length(idx.confusing), 'Total number of confusing', length(gene.confusing))
+#   }
+#   
+#   # Save
+#   saveRDS(gene.confusing, file.gene.confusing)
+# } else {
+#   gene.confusing = readRDS(file.gene.confusing)
+# }
+# 
+# 
+# # ***********************************************************************
+# # ---- Remove confusing genes from all of the files ----
+# pokaz('* Remove confusing genes from own')
+# for(acc in accessions){
+#   pokaz('Accession', acc)
+# 
+#   if(acc == '22001_mod'){
+#     file.own.merged = paste0(path.ann.own, 'gff_', '220011', '.gff')
+#   } else {
+#     file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
+#   }
+# 
+#   gff.all = read.table(file.own.merged, stringsAsFactors = F)
+#   gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+#   gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+#   gff.all$gr = gsub('ID=', '',gff.all$gr)
+# 
+#   pokaz('Before', nrow(gff.all))
+#   gff.all = gff.all[!(gff.all$gr %in% gene.confusing),]
+#   pokaz('After', nrow(gff.all))
+# 
+#   # Save
+#   options(scipen = 999)
+#   write.table(gff.all[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+#   options(scipen = 0)
+# }
+# 
+# 
+# # Remove from the pangenome annotation
+# pokaz('* Remove confusing genes from pangenome')
+# 
+# gff.all = read.table(file.pan.merged, stringsAsFactors = F)
+# gff.all$gr = sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+# gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+# gff.all$gr = gsub('ID=', '',gff.all$gr)
+# 
+# pokaz('Before', nrow(gff.all))
+# gff.all = gff.all[!(gff.all$gr %in% gene.confusing),]
+# pokaz('After', nrow(gff.all))
+# 
+# options(scipen = 999)
+# write.table(gff.all[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+# options(scipen = 0)
 
 
 # ***********************************************************************
 # ---- Get mRNA and Gene sequences ----
 pokaz('* Get sequences')
 
-for(acc in accessions.true){
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
   
   file.fasta.genes = paste0(path.fasta, 'genes_',acc,'.fasta')
   file.fasta.mrnas = paste0(path.fasta, 'mrnas_',acc,'.fasta')
@@ -446,11 +449,29 @@ for(acc in accessions.true){
 
 }
 
-# file.fasta.genes = paste0(path.fasta, 'genes.fasta')
-# file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
-# 
-# write("", file = file.fasta.genes)
-# write("", file = file.fasta.mrnas)
+stopCluster(cl)
+
+# Combine to a common file:
+
+file.fasta.genes = paste0(path.fasta, 'genes.fasta')
+file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
+
+write("", file = file.fasta.genes)
+write("", file = file.fasta.mrnas)
+
+for(acc in accessions) {
+  
+  file.fasta.genes.acc = paste0(path.fasta, 'genes_',acc,'.fasta')
+  file.fasta.mrnas.acc = paste0(path.fasta, 'mrnas_',acc,'.fasta')
+  
+  if (file.exists(file.fasta.genes.acc)) {
+    writeLines(readLines(file.fasta.genes.acc), con = file.fasta.genes, append = TRUE)
+  }
+  if (file.exists(file.fasta.mrnas.acc)) {
+    writeLines(readLines(file.fasta.mrnas.acc), con = file.fasta.mrnas, append = TRUE)
+  }
+  
+}
 
 # stop('Done')
 
