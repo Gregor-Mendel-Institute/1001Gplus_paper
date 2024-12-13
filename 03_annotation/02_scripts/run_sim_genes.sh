@@ -15,7 +15,9 @@ module load anaconda3/2019.03
 cores=30
 
 PATH_ANN="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/fasta/"
+PATH_SIM="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/simsearch/"
 
 conda activate pannagram
-parallel -j ${cores} simsearch -in_seq {} -on_seq ${PATH_ANN}genes.fasta -out ${PATH_ANN}out_{/.} ::: ${PATH_ANN}genes_*.fasta
+makeblastdb -in ${PATH_ANN}genes.fasta -dbtype nucl
 
+parallel -j ${cores} simsearch -in_seq {} -on_seq ${PATH_ANN}genes.fasta -out ${PATH_SIM}out_{/.} ::: ${PATH_ANN}genes_*.fasta

@@ -16,4 +16,10 @@ cores=30
 
 conda activate pannagram
 
-parallel -j ${cores} simsearch -in_seq {} -on_seq mrnas.fasta -out out_{/.} ::: mrnas_*.fasta
+PATH_ANN="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/fasta/"
+PATH_SIM="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/simsearch/"
+
+conda activate pannagram
+makeblastdb -in ${PATH_ANN}mrnas.fasta -dbtype nucl
+
+parallel -j ${cores} simsearch -in_seq {} -on_seq ${PATH_ANN}mrnas.fasta -out ${PATH_SIM}out_{/.} ::: ${PATH_ANN}mrnas_*.fasta

@@ -16,4 +16,13 @@ cores=30
 
 conda activate pannagram
 
-parallel -j ${cores} simsearch -in_seq {} -on_seq /groups/nordborg/projects/the1001genomesplus/01_data/09_tair10/tair10_tes.fasta -out out_te_{/.} ::: mrnas_*.fasta
+
+PATH_ANN="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/fasta/"
+PATH_SIM="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/simsearch/"
+
+FILE_DB="/groups/nordborg/projects/the1001genomesplus/01_data/09_tair10/tair10_tes.fasta"
+
+
+makeblastdb -in ${FILE_DB} -dbtype nucl
+
+parallel -j ${cores} simsearch -in_seq {} -on_seq ${FILE_DB} -out ${PATH_SIM}out_{/.} ::: ${PATH_ANN}mrnas_*.fasta
