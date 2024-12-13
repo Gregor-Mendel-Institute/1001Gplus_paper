@@ -39,68 +39,68 @@ if (!dir.exists(path.features)) dir.create(path.features)
 file.pan.merged = paste0(path.annotation, 'gff_pan_merged.gff')
 
 
-# ***********************************************************************
-# ---- mRNA and Gene frequencies ----
-pokaz('* mRNA and Gene frequencies')
-
-cl <- makeCluster(30)
-registerDoParallel(cl)
-
-df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
-  file.own.merged <- paste0(path.ann.own, 'gff_', acc, '.gff')
-  
-  gff.all <- read.table(file.own.merged, stringsAsFactors = FALSE)
-  gff.all <- gff.all[gff.all$V3 %in% c('gene', 'mRNA'), ]
-  gff.all$gr <- sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-  gff.all$gr <- sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-  gff.all$gr <- gsub('ID=', '', gff.all$gr)
-  
-  df.acc = data.frame(acc = acc, gr = gff.all$gr, type = gff.all$V3)
-  return(df.acc)
-}
-
-stopCluster(cl)
-
-cnt.genes = table(df$gr[df$type == 'gene'], df$acc[df$type == 'gene'])
-cnt.mrnas = table(df$gr[df$type == 'mRNA'], df$acc[df$type == 'mRNA'])
-
-# save(list = ls(), file = "tmp_workspace_counts.RData")
-
-write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
-write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
-
-tot.genes = rowSums(cnt.genes)
-tot.mrnas = rowSums(cnt.mrnas)
-
-gr.unique = unique(c(names(tot.genes), names(tot.mrnas)))
-
-df.tot = data.frame(matrix(0, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
-df.tot[names(tot.genes),'gene'] = tot.genes
-df.tot[names(tot.mrnas),'mrna'] = tot.mrnas
-
-write.table(df.tot, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
-
-# ***********************************************************************
-# ---- Lyrata ----
-pokaz('* Lyrata')
-
-df = read.table(paste0(path.annotation, 'cov_in_lyrata.txt'), stringsAsFactors = F)
-df = df[!is.na(df$V4),]
-
-df$comb = paste(df$V3, df$V2, df$V5, sep  = '|')
-
-x = tapply(df$V4, df$comb, max)
-
-x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
-x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
-
-gr.unique = unique(c(names(x.gene), names(x.mrna)))
-
-df.tot = data.frame(matrix(NA, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
-df.tot[names(x.gene),'gene'] = x.gene
-df.tot[names(x.mrna),'mrna'] = x.mrna
-
-write.table(df.tot, paste0(path.features, 'lyrata_coverage.txt'), sep = '\t', quote = F)
+# # ***********************************************************************
+# # ---- mRNA and Gene frequencies ----
+# pokaz('* mRNA and Gene frequencies')
+# 
+# cl <- makeCluster(30)
+# registerDoParallel(cl)
+# 
+# df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
+#   file.own.merged <- paste0(path.ann.own, 'gff_', acc, '.gff')
+#   
+#   gff.all <- read.table(file.own.merged, stringsAsFactors = FALSE)
+#   gff.all <- gff.all[gff.all$V3 %in% c('gene', 'mRNA'), ]
+#   gff.all$gr <- sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
+#   gff.all$gr <- sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
+#   gff.all$gr <- gsub('ID=', '', gff.all$gr)
+#   
+#   df.acc = data.frame(acc = acc, gr = gff.all$gr, type = gff.all$V3)
+#   return(df.acc)
+# }
+# 
+# stopCluster(cl)
+# 
+# cnt.genes = table(df$gr[df$type == 'gene'], df$acc[df$type == 'gene'])
+# cnt.mrnas = table(df$gr[df$type == 'mRNA'], df$acc[df$type == 'mRNA'])
+# 
+# # save(list = ls(), file = "tmp_workspace_counts.RData")
+# 
+# write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
+# write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
+# 
+# tot.genes = rowSums(cnt.genes)
+# tot.mrnas = rowSums(cnt.mrnas)
+# 
+# gr.unique = unique(c(names(tot.genes), names(tot.mrnas)))
+# 
+# df.tot = data.frame(matrix(0, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
+# df.tot[names(tot.genes),'gene'] = tot.genes
+# df.tot[names(tot.mrnas),'mrna'] = tot.mrnas
+# 
+# write.table(df.tot, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
+# 
+# # ***********************************************************************
+# # ---- Lyrata ----
+# pokaz('* Lyrata')
+# 
+# df = read.table(paste0(path.annotation, 'cov_in_lyrata.txt'), stringsAsFactors = F)
+# df = df[!is.na(df$V4),]
+# 
+# df$comb = paste(df$V3, df$V2, df$V5, sep  = '|')
+# 
+# x = tapply(df$V4, df$comb, max)
+# 
+# x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
+# x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
+# 
+# gr.unique = unique(c(names(x.gene), names(x.mrna)))
+# 
+# df.tot = data.frame(matrix(NA, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
+# df.tot[names(x.gene),'gene'] = x.gene
+# df.tot[names(x.mrna),'mrna'] = x.mrna
+# 
+# write.table(df.tot, paste0(path.features, 'lyrata_coverage.txt'), sep = '\t', quote = F)
 
 # ***********************************************************************
 # ---- mRNA on TEs ----
@@ -119,7 +119,7 @@ df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages =
   
   y = tapply(x$cov, x$acc, max)
   
-  df.acc = data.frame(gr = paste(names(y), acc, sep = '.'), cov = y)
+  df.acc = data.frame(gr = paste(names(y), acc, sep = '.'), group = names(y), acc = acc, cov = y)
   return(df.acc)
 }
 stopCluster(cl)
@@ -127,9 +127,13 @@ stopCluster(cl)
 save(list = ls(), file = "tmp_workspace_counts.RData")
 
 df = df[order(df$gr),]
+rownames(df) = NULL
+write.table(df, paste0(path.features, 'te_coverage_mrna.txt'), sep = '\t', quote = F, row.names = F)
 
-write.table(df, paste0(path.features, 'te_coverage_mrna.txt'), sep = '\t', quote = F)
+df.stat = data.frame(mean = tapply(df$cov, df$group, mean), max = tapply(df$cov, df$group, max))
+df.stat$group = rownames(df.stat)
 
+write.table(df.stat[,c(3,1,2)], paste0(path.features, 'te_coverage_mrna_stat.txt'), sep = '\t', quote = F, row.names = F)
 
 
 # ***********************************************************************
