@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=run_27_analys
-#SBATCH --output=echo/output_%x_output.txt
-#SBATCH --error=echo/error_%x_error.txt
+#SBATCH --output=echo/analys_output.txt
+#SBATCH --error=echo/analys_error.txt
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=30
@@ -39,10 +39,10 @@ catch() {
 # Main
 source activate pannagram
 PATH_WORK="../../../"
-PATH_PAN="${PATH_WORK}03_tools/pannagram/"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 
-${PATH_PAN}inst/analys.sh \
-	-path_msa "${PATH_ALN}pannagram_v10/intermediate/consensus/" \
-    -path_chr "${PATH_ALN}pannagram_v10/intermediate/chromosomes/" \
-    -blocks -seq -sv -sv_graph
+analys  -path_msa "${PATH_ALN}pannagram_v10_4/intermediate/consensus/"   -path_chr "${PATH_ALN}pannagram_v10_4/intermediate/chromosomes/"  -seq -sv -sv_graph -aln_type extra2_
+
+PATH_ANNOTATION='../../../01_data/04_annotation/03_edta/'
+analys -path_msa ${PATH_ALN}pannagram_v10_4/intermediate/annotation/ -annogroup ${PATH_ANNOTATION} -aln_type extra2_
+

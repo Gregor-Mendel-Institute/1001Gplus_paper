@@ -5,14 +5,14 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=30
-#SBATCH --mem=80G
+#SBATCH --mem=100G
 #SBATCH --time=08:00:00
 
 # ------------------------------------
 # Modules
 module load anaconda3/2019.03
 
-
+cores=30
 # ----------------------------------------------------------------------------
 #            ERROR HANDLING BLOCK
 # ----------------------------------------------------------------------------
@@ -40,18 +40,19 @@ catch() {
 source activate pannagram
 
 PATH_WORK="../../../"
-PATH_PAN="${PATH_WORK}03_tools/pannagram/"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 PATH_ASSEMBLY="${PATH_WORK}01_data/01_assembly/01_fasta/"
 
-${PATH_PAN}inst/pannagram.sh \
-	-path_in  ${PATH_ASSEMBLY} \
-    -path_out "${PATH_ALN}pannagram_v10/" \
+PATH_ANNOTATION='../../../01_data/04_annotation/03_edta/'
+
+pannagram \
+        -path_in  ${PATH_ASSEMBLY} \
+    -path_out "${PATH_ALN}pannagram_v10_4/" \
     -nchr 5 \
-    -cores 30 \
+    -cores ${cores} \
     -one2one \
     -purge_reps \
     -log 3 \
-    -max_len_gap 25000 
+    -max_len_gap 25000  -refs "0,10015,10024,6024"  -extra
 
 
