@@ -398,9 +398,8 @@ pokaz('* Get sequences')
 cl <- makeCluster(numCores)
 registerDoParallel(cl)
 
-# tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
-pokaz(accessions)
-for(acc in accessions) {
+tmp <- foreach(acc = accessions.true, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
+# for(acc in accessions.true) {
   
   file.fasta.genes = paste0(path.fasta, 'genes_',acc,'.fasta')
   file.fasta.mrnas = paste0(path.fasta, 'mrnas_',acc,'.fasta')
