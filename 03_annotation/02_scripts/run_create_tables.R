@@ -28,6 +28,8 @@ path.out = paste0(path.work, '01_data/02_alignment/pannagram_v10_4/intermediate/
 path.annotation = paste0(path.out, 'annotation/')
 path.ann.own = paste0(path.annotation, 'own/')
 
+path.simsearch = paste0(path.annotation, 'simsearch/')
+
 path.features = paste0(path.annotation, 'features/')
 if (!dir.exists(path.features)) dir.create(path.features)
 
@@ -38,7 +40,8 @@ file.pan.merged = paste0(path.annotation, 'gff_pan_merged.gff')
 
 
 # ***********************************************************************
-# ---- mRNA ans Gene frequences ----
+# ---- mRNA and Gene frequencies ----
+pokaz('* mRNA and Gene frequencies')
 
 cl <- makeCluster(30)
 registerDoParallel(cl)
@@ -66,31 +69,75 @@ save(list = ls(), file = "tmp_workspace_counts.RData")
 write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
 write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
 
+tot.genes = rowSums(cnt.genes)
+tot.mrnas = rowSums(cnt.mrnas)
 
+gr.unique = unique(c(rownames(tot.genes), rownames(tot.mrnas)))
 
+df.tot = data.frame(matrix(0, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
+df.tot[rownames(tot.genes),'gene'] = tot.genes
+df.tot[rownames(tot.mrnas),'mrna'] = tot.mrnas
 
-write.table(cnt.genes, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
-
-
+write.table(df.tot, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
 
 # ***********************************************************************
 # ---- Lyrata ----
+pokaz('* Lyrata')
 
+df = read.table(paste0(path.annotation, 'cov_in_lyrata.txt'), stringsAsFactors = F)
+df = df[!is.na(df$V4),]
+
+df$comb = paste(df$V3, df$V2, df$V5, sep  = '|')
+
+x = tapply(df$V4, df$comb, max)
+
+x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
+x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
+
+gr.unique = unique(c(rownames(x.gene), rownames(x.mrna)))
+
+df.tot = data.frame(matrix(NA, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
+df.tot[rownames(x.gene),'gene'] = x.gene
+df.tot[rownames(x.mrna),'mrna'] = x.mrna
+
+write.table(df.tot, paste0(path.features, 'lyrata_coverage.txt'), sep = '\t', quote = F)
 
 # ***********************************************************************
 # ---- mRNA on TEs ----
+
+cl <- makeCluster(30)
+registerDoParallel(cl)
+df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
+  
+  file.res = paste0(path.simsearch, 'out_temrnas_', acc, '/simsearch.tair10_tes.rds')
+  x = readRDS(file.res)
+
+  x$cov = x$C1 / x$len1
+  
+  x$acc = sapply(x$V1, function(s) strsplit(s, '\\|')[[1]][1])
+  
+  y = tapply(x$cov, x$acc, max)
+  
+  df.acc = data.frame(gr = paste(names(y), acc, sep = '.'), cov = y)
+  return(df.acc)
+}
+stopCluster(cl)
+
+df = df[order(df$gr),]
+
+write.table(df, paste0(path.features, 'te_coverage_mrna.txt'), sep = '\t', quote = F)
+
 
 
 # ***********************************************************************
 # ---- mRNA on mRNA ----
 
 
+
+
+
 # ***********************************************************************
 # ---- Genes on Genes ----
-
-
-# ***********************************************************************
-# ---- mRNA ans Gene frequences ----
 
 
 
