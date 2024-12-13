@@ -64,7 +64,7 @@ stopCluster(cl)
 cnt.genes = table(df$gr[df$type == 'gene'], df$acc[df$type == 'gene'])
 cnt.mrnas = table(df$gr[df$type == 'mRNA'], df$acc[df$type == 'mRNA'])
 
-save(list = ls(), file = "tmp_workspace_counts.RData")
+# save(list = ls(), file = "tmp_workspace_counts.RData")
 
 write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
 write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
@@ -72,11 +72,11 @@ write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quo
 tot.genes = rowSums(cnt.genes)
 tot.mrnas = rowSums(cnt.mrnas)
 
-gr.unique = unique(c(rownames(tot.genes), rownames(tot.mrnas)))
+gr.unique = unique(c(names(tot.genes), names(tot.mrnas)))
 
 df.tot = data.frame(matrix(0, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
-df.tot[rownames(tot.genes),'gene'] = tot.genes
-df.tot[rownames(tot.mrnas),'mrna'] = tot.mrnas
+df.tot[names(tot.genes),'gene'] = tot.genes
+df.tot[names(tot.mrnas),'mrna'] = tot.mrnas
 
 write.table(df.tot, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
 
@@ -94,20 +94,21 @@ x = tapply(df$V4, df$comb, max)
 x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
 x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
 
-gr.unique = unique(c(rownames(x.gene), rownames(x.mrna)))
+gr.unique = unique(c(names(x.gene), names(x.mrna)))
 
 df.tot = data.frame(matrix(NA, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
-df.tot[rownames(x.gene),'gene'] = x.gene
-df.tot[rownames(x.mrna),'mrna'] = x.mrna
+df.tot[names(x.gene),'gene'] = x.gene
+df.tot[names(x.mrna),'mrna'] = x.mrna
 
 write.table(df.tot, paste0(path.features, 'lyrata_coverage.txt'), sep = '\t', quote = F)
 
 # ***********************************************************************
 # ---- mRNA on TEs ----
+pokaz('* TEs')
 
 cl <- makeCluster(30)
 registerDoParallel(cl)
-df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
+df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
   
   file.res = paste0(path.simsearch, 'out_temrnas_', acc, '/simsearch.tair10_tes.rds')
   x = readRDS(file.res)
@@ -122,6 +123,8 @@ df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram'
   return(df.acc)
 }
 stopCluster(cl)
+
+save(list = ls(), file = "tmp_workspace_counts.RData")
 
 df = df[order(df$gr),]
 
