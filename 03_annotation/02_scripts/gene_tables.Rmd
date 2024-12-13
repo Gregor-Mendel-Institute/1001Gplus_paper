@@ -1,0 +1,31 @@
+---
+title: "Final statistics about genes"
+output: null_document
+---
+
+# Paths
+```{r}
+
+path.annotation = '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/vienn/pacbio/1001Gplus/01_data/02_alignment/pannagram_v10_4/intermediate/annotation/'
+
+```
+
+
+# Lyrata
+```{r}
+
+
+df = read.table(paste0(path.annotation,'cov_in_lyrata.txt'), stringsAsFactors = F)
+df = df[!is.na(df$V4),]
+
+
+df$comb = paste(df$V3, df$V2, df$V5, sep  = '|')
+
+x = tapply(df$V4, df$comb, max)
+
+x.gene = tapply(df$V4[df$V5 == 'gene'], df$V3[df$V5 == 'gene'], max)
+x.mrna = tapply(df$V4[df$V5 == 'mRNA'], df$V3[df$V5 == 'mRNA'], max)
+
+
+setdiff(row)
+```
