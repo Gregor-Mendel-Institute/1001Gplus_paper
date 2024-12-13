@@ -42,7 +42,7 @@ PATH_WORK="../../../"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 PATH_OUT="${PATH_ALN}pannagram_v10_4/"
 
-PATH_ANNOTATION="${PATH_WORK}01_data/04_annotation/01_raw_max/"  #Annotation of genes
+PATH_ANNOTATION="${PATH_WORK}01_data/03_annotation/01_raw_max/"  #Annotation of genes
 
 analys -path_msa ${PATH_OUT}/intermediate/annotation/ -annogroup ${PATH_ANNOTATION} -aln_type extra2_
 
