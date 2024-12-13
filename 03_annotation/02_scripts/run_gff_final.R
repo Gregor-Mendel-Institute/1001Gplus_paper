@@ -389,12 +389,12 @@ initial.vars <- ls()
 # options(scipen = 999)
 # write.table(gff.all[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t')
 # options(scipen = 0)
-
-
-# ***********************************************************************
-# ---- Get mRNA and Gene sequences ----
-pokaz('* Get sequences')
-
+#
+#
+# # ***********************************************************************
+# # ---- Get mRNA and Gene sequences ----
+# pokaz('* Get sequences')
+#
 # cl <- makeCluster(numCores)
 # registerDoParallel(cl)
 #
@@ -451,9 +451,9 @@ pokaz('* Get sequences')
 # }
 # 
 # stopCluster(cl)
-
-# Combine to a common file:
-
+# 
+# # Combine to a common file:
+#
 # file.fasta.genes = paste0(path.fasta, 'genes.fasta')
 # file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
 # 
@@ -490,11 +490,11 @@ s.combs <- strsplit(s.comb.lyrata, "_")
 s.combs <- data.frame(do.call(rbind, s.combs))
 s.combs$s = s.comb.lyrata
 
-cl <- makeCluster(numCores)
-registerDoParallel(cl)
+# cl <- makeCluster(numCores)
+# registerDoParallel(cl)
 
-results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
-# for(acc in accessions.true){
+# results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
+for(acc in accessions.true){
   pokaz('Accession', acc)
 
   file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
@@ -505,7 +505,7 @@ results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('panna
   gff.all$gr = gsub('ID=', '',gff.all$gr)
   gff.all.all = gff.all
 
-  accession_results <- list()
+  # accession_results <- list()
   
   for(i.chr in 1:5){
     pokaz('Chromosome', i.chr)
@@ -553,16 +553,16 @@ results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('panna
 
       df.lyrata = data.frame(comb = s.c, acc = acc, gr = gff.all$gr, cov = lyrata.cov, type = gff.all$V3)
   
-      # write.table(df.lyrata, file.lyrata.res, append = T, row.names = F, col.names = F, sep = '\t', quote = F)
-      accession_results <- append(accession_results, list(df.lyrata))
+      write.table(df.lyrata, file.lyrata.res, append = T, row.names = F, col.names = F, sep = '\t', quote = F)
+      # accession_results <- append(accession_results, list(df.lyrata))
     }
   }
-  return(accession_results)
+  # return(accession_results)
 }
 
-stopCluster(cl)
+# stopCluster(cl)
 
-write.table(results, file.lyrata.res, row.names = FALSE, col.names = TRUE, sep = '\t', quote = FALSE)
+# write.table(results, file.lyrata.res, row.names = FALSE, col.names = TRUE, sep = '\t', quote = FALSE)
 
 
 
