@@ -25,4 +25,4 @@ FILE_DB="/groups/nordborg/projects/the1001genomesplus/01_data/09_tair10/tair10_t
 
 makeblastdb -in ${FILE_DB} -dbtype nucl
 
-parallel -j ${cores} simsearch -in_seq {} -on_seq ${FILE_DB} -out ${PATH_SIM}out_{/.} ::: ${PATH_ANN}mrnas_*.fasta
+parallel -j ${cores} simsearch -in_seq {} -on_seq ${FILE_DB} -out ${PATH_SIM}out_te{/.} ::: ${PATH_ANN}mrnas_*.fasta
