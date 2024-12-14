@@ -31,6 +31,7 @@ path.ann.own = paste0(path.annotation, 'own/')
 
 path.simsearch = paste0(path.annotation, 'simsearch/')
 
+path.fasta = paste0(path.annotation, 'fasta/')
 path.features = paste0(path.annotation, 'features/')
 if (!dir.exists(path.features)) dir.create(path.features)
 
@@ -156,14 +157,89 @@ df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages =
   return(x[, c('V1', 'V8')])
 }
 stopCluster(cl)
+# save(list = ls(), file = "tmp_workspace_counts.RData")
 
-save(list = ls(), file = "tmp_workspace_counts.RData")
+# Create the graph and get connected components
 
+x.graph <- igraph::make_graph(t(df), directed = F)
+x.comp <- igraph::components(x.graph)
+
+pokaz('Number of similarity groups', x.comp$no)
+
+width <- nchar(as.character(x.comp$no))
+simgr.names = paste0('SimGrM_', sprintf(paste0("%0", width+1, "d"), 1:x.comp$no))
+
+df.sim = data.frame(group = names(x.comp$members), sim.gr.m = simgr.names[x.comp$members])
+
+# Additional names
+file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
+x = readFasta(file.fasta.mrnas)
+x.names = names(x)
+
+x.add = setdiff(x.names, df.sim$group)
+simgr.names.add = paste0('SimGrM_u', sprintf(paste0("%0", width, "d"), 1:length(x.add)))
+df.add = data.frame(group = x.add, sim.gr.m = simgr.names.add)
+pokaz('Number of additional groups', nrow(df.add))
+
+df.sim = rbind(df.sim, df.add)
+df.sim = df.sim[order(df.sim$group),]
+
+write.table(df.sim, paste0(path.features, 'sim_groups_mrna.txt'), sep = '\t', quote = F, row.names = F)
 
 # ***********************************************************************
 # ---- Genes on Genes ----
+pokaz('* Genes on Genes')
+
+cov.cutoff = 0.85
+
+cl <- makeCluster(30)
+registerDoParallel(cl)
+df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
+  
+  file.res = paste0(path.simsearch, 'out_genes_', acc, '/simsearch.genes.rds')
+  x = readRDS(file.res)
+  
+  x = x[(x$p1 > cov.cutoff) & (x$p8 > cov.cutoff),]
+  
+  return(x[, c('V1', 'V8')])
+}
+stopCluster(cl)
+# save(list = ls(), file = "tmp_workspace_counts.RData")
+
+# Create the graph and get connected components
+
+x.graph <- igraph::make_graph(t(df), directed = F)
+x.comp <- igraph::components(x.graph)
+
+pokaz('Number of similarity groups', x.comp$no)
+
+width <- nchar(as.character(x.comp$no))
+simgr.names = paste0('SimGrG_', sprintf(paste0("%0", width+1, "d"), 1:x.comp$no))
+
+df.sim = data.frame(group = names(x.comp$members), sim.gr.m = simgr.names[x.comp$members])
+
+# Additional names
+file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
+x = readFasta(file.fasta.mrnas)
+x.names = names(x)
+
+x.add = setdiff(x.names, df.sim$group)
+simgr.names.add = paste0('SimGrG_u', sprintf(paste0("%0", width, "d"), 1:length(x.add)))
+df.add = data.frame(group = x.add, sim.gr.m = simgr.names.add)
+pokaz('Number of additional groups', nrow(df.add))
+
+df.sim = rbind(df.sim, df.add)
+df.sim = df.sim[order(df.sim$group),]
+
+write.table(df.sim, paste0(path.features, 'sim_groups_genes.txt'), sep = '\t', quote = F, row.names = F)
 
 
+# ***********************************************************************
+# ---- Confusing genes and mRNAs ----
+pokaz('* Confusing genes and mRNAs')
+
+df.mrnas = read.table(paste0(path.features, 'sim_groups_mrna.txt'))
+df.genes = read.table(paste0(path.features, 'sim_groups_genes.txt'))
 
 
 
