@@ -204,7 +204,6 @@ df <- foreach(acc = setdiff(accessions.true, '0'), .combine = rbind, .packages =
   return(x[, c('V1', 'V8')])
 }
 stopCluster(cl)
-# save(list = ls(), file = "tmp_workspace_counts.RData")
 
 # Create the graph and get connected components
 
@@ -222,6 +221,8 @@ df.sim = data.frame(group = names(x.comp$members), sim.gr = simgr.names[x.comp$m
 file.fasta.mrnas = paste0(path.fasta, 'genes.fasta')
 x = readFasta(file.fasta.mrnas)
 x.names = names(x)
+
+save(list = ls(), file = "tmp_workspace_counts.RData")
 
 pokaz(setdiff(df.sim$group, x.names))
 
