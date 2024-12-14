@@ -1,6 +1,7 @@
 library(rhdf5)
 library(crayon)
 library(pannagram)
+library(igraph)
 
 library(foreach)
 library(doParallel)
