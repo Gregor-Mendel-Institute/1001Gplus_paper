@@ -460,7 +460,7 @@ file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
 write("", file = file.fasta.genes)
 write("", file = file.fasta.mrnas)
 
-for(acc in accessions) {
+for(acc in accessions.true) {
   pokaz('Accession', acc)
 
   file.fasta.genes.acc = paste0(path.fasta, 'genes_',acc,'.fasta')
