@@ -169,7 +169,7 @@ file.pan.merged = paste0(path.annotation, 'gff_pan_merged.gff')
 # width <- nchar(as.character(x.comp$no))
 # simgr.names = paste0('SimGrM_', sprintf(paste0("%0", width+1, "d"), 1:x.comp$no))
 # 
-# df.sim = data.frame(group = names(x.comp$members), sim.gr.m = simgr.names[x.comp$members])
+# df.sim = data.frame(group = names(x.comp$members), sim.gr = simgr.names[x.comp$members])
 # 
 # # Additional names
 # file.fasta.mrnas = paste0(path.fasta, 'mrnas.fasta')
@@ -178,13 +178,13 @@ file.pan.merged = paste0(path.annotation, 'gff_pan_merged.gff')
 # 
 # x.add = setdiff(x.names, df.sim$group)
 # simgr.names.add = paste0('SimGrM_u', sprintf(paste0("%0", width, "d"), 1:length(x.add)))
-# df.add = data.frame(group = x.add, sim.gr.m = simgr.names.add)
+# df.add = data.frame(group = x.add, sim.gr = simgr.names.add)
 # pokaz('Number of additional groups', nrow(df.add))
 # 
 # df.sim = rbind(df.sim, df.add)
 # df.sim = df.sim[order(df.sim$group),]
 # 
-# write.table(df.sim, paste0(path.features, 'sim_groups_mrna.txt'), sep = '\t', quote = F, row.names = F)
+# write.table(df.sim, paste0(path.features, 'sim_groups_mrnas.txt'), sep = '\t', quote = F, row.names = F)
 
 # ***********************************************************************
 # ---- Genes on Genes ----
@@ -223,6 +223,8 @@ file.fasta.mrnas = paste0(path.fasta, 'genes.fasta')
 x = readFasta(file.fasta.mrnas)
 x.names = names(x)
 
+pokaz(setdiff(df.sim$group, x.names))
+
 x.add = setdiff(x.names, df.sim$group)
 simgr.names.add = paste0('SimGrG_u', sprintf(paste0("%0", width, "d"), 1:length(x.add)))
 df.add = data.frame(group = x.add, sim.gr = simgr.names.add)
@@ -238,12 +240,12 @@ write.table(df.sim, paste0(path.features, 'sim_groups_genes.txt'), sep = '\t', q
 # ---- Confusing genes and mRNAs ----
 pokaz('* Confusing genes and mRNAs')
 
-df.mrnas = read.table(paste0(path.features, 'sim_groups_mrna.txt'))
-df.genes = read.table(paste0(path.features, 'sim_groups_genes.txt'))
+df.mrnas = read.table(paste0(path.features, 'sim_groups_mrnas.txt'), stringsAsFactors = F, header = 1)
+df.genes = read.table(paste0(path.features, 'sim_groups_genes.txt'), stringsAsFactors = F, header = 1)
 
 
 df.mrnas$gr = sapply(df.mrnas$group, function(s) strsplit(s, '\\|')[[1]][1])
-df.genes$gr = sapply(df.mrnas$group, function(s) strsplit(s, '\\|')[[1]][1])
+df.genes$gr = sapply(df.genes$group, function(s) strsplit(s, '\\|')[[1]][1])
 
 cnt.mrnas = tapply(df.mrnas$sim.gr, df.mrnas$gr, function(s) length(unique(s)))
 cnt.genes = tapply(df.genes$sim.gr, df.genes$gr, function(s) length(unique(s)))
