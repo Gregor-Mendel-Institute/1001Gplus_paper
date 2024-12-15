@@ -188,7 +188,7 @@ gff2.add = gff2[!(gff2$gr %in% tair10.used),]
 pokaz('Additional TAIR10 genes', nrow(gff2.add))
 
 df.genes.new = data.frame(V1 = paste0('Pannagram_Chr', df.pangen$chr),
-                          V2 = 'Pannagram',
+                          V2 = 'pannagram',
                           V3 = 'gene',
                           V4 = df.pangen$beg,
                           V5 = df.pangen$end,
@@ -198,7 +198,7 @@ df.genes.new = data.frame(V1 = paste0('Pannagram_Chr', df.pangen$chr),
                           V9 = df.pangen$name)
 
 df.genes.tair = data.frame(V1 = paste0('Pannagram_Chr', gff2.add$chr),
-                           V2 = 'Pan_tair10',
+                           V2 = 'pannagram',
                            V3 = 'gene',
                            V4 = gff2.add$V4,
                            V5 = gff2.add$V5,
@@ -222,7 +222,8 @@ if(!file.exists(file.genes.only)){
   gff.pan.merged = mergeAnn(gff.new, gff.pan.all)
 
   options(scipen = 999)
-  write.table(gff.pan.merged[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+  cat("##gff-version 3\n", file = file.pan.merged)
+  write.table(gff.pan.merged[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t', append = T)
   options(scipen = 0)
 
 }
@@ -298,11 +299,43 @@ tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) 
   } else {
     gff.own.rest = gff.own[gff.own$V1 %in% paste0(acc, '_Chr', 1:5),]
   }
+
+  
+  # Check genes and mRNAs
+  gff.g = gff.own.genes
+  gff.m = gff.own.rest[gff.own.rest$V3 == 'mRNA',]
+  
+  gff.g$gr = sapply(gff.g$V9, function(s) strsplit(s, '\\.')[[1]][1])
+  gff.g$gr = sapply(gff.g$gr, function(s) strsplit(s, ';')[[1]][1])
+  gff.g$gr = gsub('ID=', '',gff.g$gr)  
+  gff.m$gr = sapply(gff.m$V9, function(s) strsplit(s, '\\.')[[1]][1])
+  gff.m$gr = sapply(gff.m$gr, function(s) strsplit(s, ';')[[1]][1])
+  gff.m$gr = gsub('ID=', '',gff.m$gr)  
+  
+  genes.to.add = setdiff(gff.m$gr, gff.g$gr)
+  if(length(genes.to.add) > 0){
+    gff.g.add = gff.m[gff.m$gr %in% genes.to.add,]
+    
+    # Fix
+    gff.g.add$type = 'gene'
+    gff.g.add$V9 = paste0('ID=', gff.g.add$gr)
+    
+    # Append
+    gff.g.add = gff.g.add[,1:9]
+    gff.own.genes = rbind(gff.own.genes, gff.g.add)
+    gff.own.genes = gff.own.genes[order(gff.own.genes$V4),]
+    gff.own.genes = gff.own.genes[order(gff.own.genes$V1),]
+  }
+  
+  
+  # Merge
   gff.own.merged = mergeAnn(gff.own.genes, gff.own.rest)
+  
 
   # Save
   options(scipen = 999)
-  write.table(gff.own.merged[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+  cat("##gff-version 3\n", file = file.own.merged)
+  write.table(gff.own.merged[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t', append = T)
   options(scipen = 0)
 
   return(NULL)
@@ -369,7 +402,8 @@ for(acc in accessions){
 
   # Save
   options(scipen = 999)
-  write.table(gff.all[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+  cat("##gff-version 3\n", file = file.own.merged)
+  write.table(gff.all[,1:9], file = file.own.merged, row.names = F, col.names = F, quote = F, sep = '\t', append = T)
   options(scipen = 0)
 }
 
@@ -387,7 +421,8 @@ gff.all = gff.all[!(gff.all$gr %in% gene.confusing),]
 pokaz('After', nrow(gff.all))
 
 options(scipen = 999)
-write.table(gff.all[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t')
+cat("##gff-version 3\n", file = file.pan.merged)
+write.table(gff.all[,1:9], file = file.pan.merged, row.names = F, col.names = F, quote = F, sep = '\t', append = T)
 options(scipen = 0)
 
 
