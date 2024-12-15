@@ -55,7 +55,7 @@ analys -path_msa ${PATH_OUT}/intermediate/annotation/ -annogroup ${PATH_ANNOTATI
 
 # ------------------------------------
 # Get fixed annotation
-Rscript run_gff_final.R
+# Rscript run_gff_final.R
 
 
 

@@ -31,3 +31,12 @@ To extract features, execute the following R script:
 ```bash
 Rscript run_get_features.R
 ```
+
+## Rename accessions
+Rename:  
+220011 -> 22001_mod
+10015 -> 6962
+```bash
+Rscript fix_renamed_acc.R
+```
+
