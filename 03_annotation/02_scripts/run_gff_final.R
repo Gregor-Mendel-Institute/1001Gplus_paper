@@ -525,10 +525,6 @@ s.combs <- strsplit(s.comb.lyrata, "_")
 s.combs <- data.frame(do.call(rbind, s.combs))
 s.combs$s = s.comb.lyrata
 
-# cl <- makeCluster(numCores)
-# registerDoParallel(cl)
-
-# results <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5')) %dopar% {
 for(acc in accessions.true){
   pokaz('Accession', acc)
 
@@ -539,8 +535,6 @@ for(acc in accessions.true){
   gff.all$gr = sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
   gff.all$gr = gsub('ID=', '',gff.all$gr)
   gff.all.all = gff.all
-
-  # accession_results <- list()
   
   for(i.chr in 1:5){
     pokaz('Chromosome', i.chr)
@@ -589,15 +583,9 @@ for(acc in accessions.true){
       df.lyrata = data.frame(comb = s.c, acc = acc, gr = gff.all$gr, cov = lyrata.cov, type = gff.all$V3)
   
       write.table(df.lyrata, file.lyrata.res, append = T, row.names = F, col.names = F, sep = '\t', quote = F)
-      # accession_results <- append(accession_results, list(df.lyrata))
     }
   }
-  # return(accession_results)
 }
-
-# stopCluster(cl)
-
-# write.table(results, file.lyrata.res, row.names = FALSE, col.names = TRUE, sep = '\t', quote = FALSE)
 
 
 
