@@ -286,10 +286,10 @@ tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) 
     file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
   }
 
-  if(acc == '10002'){
-    save(list = ls(), file = "tmp_workspace_10002.RData")  
-    stop()
-  }
+  # if(acc == '10002'){
+  #   save(list = ls(), file = "tmp_workspace_10002.RData")  
+  #   stop()
+  # }
 
   if(file.exists(file.own.merged)) return(NULL)
 
