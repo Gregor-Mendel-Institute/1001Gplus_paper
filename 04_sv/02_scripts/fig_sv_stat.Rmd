@@ -10,13 +10,15 @@ output: null_document
 library(ggplot2)
 library(pannagram)
 library(gridExtra)
+library(ggpubr)  # ggarrange
+
 ```
 
 ## Paths
 ```{r, message=FALSE}
 
 path.base = '../../../'
-path.data = paste0(path.base, '01_data/03_annotation/02_pannagram/svs_v03_p01/')
+path.data = paste0(path.base, '01_data/03_annotation/02_pannagram/svs_v10_4/')
 
 path.figures = '../03_figures/'
 
@@ -35,45 +37,34 @@ file.sv.all = 'sv_all_events.rds'
 sv.pos.beg = readRDS(paste0(path.data, 'sv_pangen_beg.rds'))
 sv.pos.end = readRDS(paste0(path.data, 'sv_pangen_end.rds'))
 
-sv.pos = readRDS(paste0(path.data, 'sv_pangen_pos.rds'))
+svs = readRDS(paste0(path.data, 'sv_pangen_pos.rds'))
 
 ```
 
 
+# Stat
+## Length binning
 
-# Reading
 ```{r}
-sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+breaks <- c(0, 15, 50, 100, 200, 500, 1000, 2000, 5000, Inf)
 
-# Rename groups
-lev.replace = c('[1,10]', '(10,15]')
-lev.new = '[1,15]'
+labels <- c("[1,15]", "(15,50]", "(50,100]", "(100,200]", 
+            "(200,500]", "(500,1k]", "(1k,2k]", "(2k,5k]", "(5k,Inf]")
 
-s.levels = as.character(levels(sv.se$len.gr))
-s.levels = s.levels[!(s.levels %in% lev.replace)]
-s.levels = c(lev.new, s.levels)
-s.levels = gsub("e\\+03", "k", s.levels)
+svs$len.gr <- cut(svs$len, breaks = breaks, labels = labels, right = TRUE)
 
-sv.se$len.gr = as.character(sv.se$len.gr)
-sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
-sv.se$len.gr = gsub("e\\+03", "k", sv.se$len.gr)
-sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
-
-
-sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
-
-sv.pos.beg = read.table(paste(path.work, 'svs_all_beg_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
-sv.pos.end = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
-
-# sv.se = sv.se[sv.se$gr %in% sv.my.seb$gr,]
+```
+## Single events
+```{r}
+sv.se = svs[svs$single == 1,]
 ```
 
 
 ## Stat
 ```{r}
-pokaz('Number of all SVs', nrow(sv.all))
-pokaz('Number of SVs len >= 15', sum(sv.all$len >= 15))
-pokaz('me-se', paste0(c(table(sv.all$single[sv.all$len >= 15])), collapse = ' '))
+pokaz('Number of all SVs', nrow(svs))
+pokaz('Number of SVs len >= 15', sum(svs$len >= 15))
+pokaz('me-se', paste0(c(table(svs$single[svs$len >= 15])), collapse = ' '))
 ```
 
 ### TODO: Additional me-SV categories
@@ -91,8 +82,8 @@ res.len = c()
 thresholds = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13)
 thresholds = c(0,15,50,100, 1000)
 for(thresh in thresholds){
-  cnt = c(table(sv.all$single[sv.all$len >thresh]))
-  tmp = c(sum(sv.all$len >thresh), cnt, as.numeric(sprintf("%.2f",cnt[2]/cnt[1])))
+  cnt = c(table(svs$single[svs$len >thresh]))
+  tmp = c(sum(svs$len >thresh), cnt, as.numeric(sprintf("%.2f",cnt[2]/cnt[1])))
   res.len = rbind(res.len, tmp)
 }
 colnames(res.len) = c('all', 'me', 'se', 'ratio')
@@ -144,10 +135,10 @@ p = p + theme(plot.margin = unit(c(-1, -1, -1, -1), "cm"))
 
 # Correspondence between pangenome and accession coordinates
 ```{r}
-i.chr = 5
+i.chr = 1
 i.acc = 1
-df = data.frame(pangenome = sv.all$beg[sv.all$chr == i.chr], 
-                accession = sv.pos.beg[sv.all$chr == i.chr, i.acc])
+df = data.frame(pangenome = svs$beg[svs$chr == i.chr], 
+                accession = sv.pos.beg[svs$chr == i.chr, i.acc])
 df = df[df[,2] != 0,]
 # plot(df[,1], df[,2])
 
@@ -231,7 +222,8 @@ p.corresp = p
 ```{r}
 
 len.min = 15
-g <- ggplot(sv.all[sv.all$len > len.min,], aes(x=beg, fill = as.factor(single))) + 
+len.min = 1000
+g <- ggplot(svs[svs$len > len.min,], aes(x=beg, fill = as.factor(single))) + 
   geom_histogram(bins = 50, color='grey20') + theme_minimal() + 
   facet_grid(rows = vars(chr)) + 
   theme(panel.border = element_rect(colour = "black", fill=NA),
@@ -239,12 +231,11 @@ g <- ggplot(sv.all[sv.all$len > len.min,], aes(x=beg, fill = as.factor(single)))
         strip.text.y = element_text(angle = 0)) +
   labs( x = "Pangenome coordinate", y = "Count") +
   scale_fill_manual(values = c('#F48484', '#B5D5C5'),name = "", labels = c('meSV', 'seSV'))
-  
 g
 
-pdf(paste(path.figures, 'sv_all_chromosome_pangen_coord_len_',len.min,'bp.pdf', sep = ''), width = 6, height = 4)
-print(g)     # Plot 1 --> in the first page of PDF
-dev.off()
+# pdf(paste(path.figures, 'sv_all_chromosome_pangen_coord_len_',len.min,'bp.pdf', sep = ''), width = 6, height = 4)
+# print(g)     # Plot 1 --> in the first page of PDF
+# dev.off()
 
 
 ```
@@ -297,7 +288,7 @@ dev.off()
 ```{r}
 # i.chr = 5
 
-bin.width = seq(0, max(sv.all$end[sv.all$chr == i.chr]), 1000000)
+bin.width = seq(0, max(svs$end[sv.all$chr == i.chr]), 1000000)
 
 len.cutoffs = c(1, 15, 50, 100, 1000, Inf)
 df.bins.all = c()
@@ -305,9 +296,7 @@ for(i in 1:(length(len.cutoffs) - 1)){
   
   df.bins <- sv.all[sv.all$chr == i.chr,] %>%
     filter((len >= len.cutoffs[i]) & (len < len.cutoffs[i+1])) %>%
-    # Вычисляем ширину каждого бина
     mutate(bins = cut(beg, breaks=bin.width)) %>%
-    # Группируем по хромосомам, бинам и значениям single, затем считаем количество
     group_by(chr, bins, single) %>%
     summarise(count = n()) %>%
     ungroup()
@@ -371,7 +360,7 @@ dev.off()
 # hist(sv.se$freq.max)
 len.min = 15 
 
-cnt = as.matrix(table(sv.se$freq.max[sv.se$len>=len.min], sv.se$len.gr[sv.se$len>=len.min]))
+cnt = as.matrix(table(sv.se$freq.max[sv.se$len > len.min], sv.se$len.gr[sv.se$len > len.min]))
 # cnt = cnt[-1,]
 # cnt = apply(cnt, 2, function(x) x / sum(x))
 

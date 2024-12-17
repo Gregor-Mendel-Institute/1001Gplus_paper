@@ -1,0 +1,127 @@
+---
+title: "Create new annotations for 220011"
+output: html_notebook
+---
+
+
+# Setup
+```{r}
+library(ggplot2)
+ann.files = c('/Volumes/Samsung_T5/vienn/annotation/22001.gff',
+              '/Volumes/Samsung_T5/vienn/ann_repeats/22001/22001.Repeats_TEanno.gff3',
+              '/Volumes/Samsung_T5/vienn/ann_repeats/22001/22001.Repeats.gff',
+              '/Volumes/Samsung_T5/vienn/ann_repeats/22001/22001.scaffolds_corrected.with_unplaced.v2.1.fasta.mod.EDTA.TEanno.gff3')
+
+direction = c('+', '-')
+names(direction) = c('-', '+')
+
+```
+
+
+```{r}
+
+for(i.ann in 1:length(ann.files)){
+  print(i.ann)
+  
+  ann = read.table(ann.files[i.ann], stringsAsFactors = F)
+  ann$chr = as.numeric(sapply(ann$V1, function(s) strsplit(s, '_Chr')[[1]][2]))
+
+  sum(is.na(ann$chr))
+  ann = ann[!is.na(ann$chr),]
+  unique(ann$V1)
+  
+  ann$stay = 0
+  
+  ann0 = ann
+  
+  idx.move5 =  which((ann$chr == 5) & (ann$V4 >= 16278661) & (ann$V5 >= 16278661))
+  idx.stay5 =  which((ann$chr == 5) & (ann$V4 < 16278661) & (ann$V5 < 16278661))
+  idx.move3 = which((ann$chr == 3) & (ann$V4 <= 10737915) & (ann$V5 <= 10737915))
+  idx.stay3 = which((ann$chr == 3) & (ann$V4 > 10737915) & (ann$V5 > 10737915))  # don't do anything
+  
+  ann$stay[idx.move3] = 1
+  ann$stay[idx.move5] = 2
+  
+  g <- ggplot(ann, aes(x=V4, fill = as.factor(stay))) + 
+  geom_histogram(bins = 50, color='grey20', alpha=0.7) +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(V1)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + viridis::scale_fill_viridis(discrete=TRUE) 
+  
+  g
+  
+  
+  # ============================================================================
+  ann = ann0
+  # change 5th chromosome
+  idx.move5 =  which((ann$chr == 5) & (ann$V4 >= 16278661) & (ann$V5 >= 16278661))
+  idx.stay5 =  which((ann$chr == 5) & (ann$V4 < 16278661) & (ann$V5 < 16278661))
+  idx.remove5 = setdiff(which(ann$chr == 5), idx.move5)
+  idx.remove5 = setdiff(idx.remove5, idx.stay5)
+  
+  # change 3th chromosome
+  idx.move3 = which((ann$chr == 3) & (ann$V4 <= 10737915) & (ann$V5 <= 10737915))
+  idx.stay3 = which((ann$chr == 3) & (ann$V4 > 10737915) & (ann$V5 > 10737915))  # don't do anything
+  idx.remove3 = setdiff(which(ann$chr == 3), idx.move3)
+  idx.remove3 = setdiff(idx.remove3, idx.stay3)
+  
+  # Fix the positions in #d chromosome
+  l3 = 10737915
+  l5 = 18097301 - 16278661 + 1
+  ann$V4[idx.stay3] = ann$V4[idx.stay3] - l3 + l5
+  ann$V5[idx.stay3] = ann$V5[idx.stay3] - l3 + l5
+  n3 = 32486918 - 10737915
+  n5 = 16278660
+  
+  # move 3th part -> 5th + inversion
+  ann$V4[idx.move3] = (l3 - ann$V4[idx.move3] + 1) + n5
+  ann$V5[idx.move3] = (l3 - ann$V5[idx.move3] + 1) + n5
+  ann$V7[idx.move3] = direction[ann$V7[idx.move3]]
+  ann$V9[idx.move3] = gsub('22001_Chr3.', '22001_Chr5.x', ann$V9[idx.move3])
+  ann$V1[idx.move3] = '22001_Chr5'
+  ann$stay[idx.move3] = 1
+  
+  ann$V4[idx.move5] = (l5 - (ann$V4[idx.move5] - n5) + 1)
+  ann$V5[idx.move5] = (l5 - (ann$V5[idx.move5] - n5) + 1)
+  ann$V7[idx.move5] = direction[ann$V7[idx.move5]]
+  ann$V9[idx.move5] = gsub('22001_Chr5.', '22001_Chr3.x', ann$V9[idx.move5])
+  ann$V1[idx.move5] = '22001_Chr3'
+  ann$stay[idx.move5] = 2
+  
+  idx.remove = c(idx.remove5, idx.remove3)
+  if(length(idx.remove) > 0) ann = ann[-idx.remove, ]
+  
+  g <- ggplot(ann, aes(x=V4, fill = as.factor(stay))) + 
+  geom_histogram(bins = 50,color='grey20', alpha=0.7) +
+  # geom_bar(position="fill", stat="identity") +
+  theme_minimal() + 
+  facet_grid(rows = vars(V1)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + viridis::scale_fill_viridis(discrete=TRUE) 
+  g
+  
+  # ============================================================================
+  
+  idx = ann$V4 > ann$V5
+  tmp = ann$V4[idx]
+  ann$V4[idx] = ann$V5[idx]
+  ann$V5[idx] = tmp
+  
+  # Final makeup
+  ann$V1 = gsub('22001', '22001_mod', ann$V1)
+  ann$V9 = gsub('22001', '22001_mod', ann$V9)
+  ann = ann[,1:9]
+  
+  # Save results
+  file.new = gsub('22001', '22001_mod', ann.files[i.ann]) 
+  write.table(ann, file.new, row.names = F, col.names = F, sep = '\t', quote =F)
+}
+
+
+```
+
+

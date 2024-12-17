@@ -42,7 +42,3 @@ PATH_WORK="../../../"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 
 analys  -path_msa "${PATH_ALN}pannagram_v10_4/intermediate/consensus/"   -path_chr "${PATH_ALN}pannagram_v10_4/intermediate/chromosomes/"  -seq -sv -sv_graph -aln_type extra2_
-
-PATH_ANNOTATION='../../../01_data/04_annotation/03_edta/'
-analys -path_msa ${PATH_ALN}pannagram_v10_4/intermediate/annotation/ -annogroup ${PATH_ANNOTATION} -aln_type extra2_
-

@@ -320,7 +320,7 @@ tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) 
     gff.g.add = gff.m[gff.m$gr %in% genes.to.add,]
     
     # Fix
-    gff.g.add$type = 'gene'
+    gff.g.add$V3 = 'gene'
     gff.g.add$V9 = paste0('ID=', gff.g.add$gr)
     
     # Append
