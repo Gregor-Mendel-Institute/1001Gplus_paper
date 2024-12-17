@@ -1,5 +1,6 @@
 01_data/**
 !01_data/**/README.md
+*.html
 *.pdf
 *.png
 *.pptx
