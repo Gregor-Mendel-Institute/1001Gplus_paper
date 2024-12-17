@@ -286,6 +286,10 @@ tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) 
     file.own.merged = paste0(path.ann.own, 'gff_', acc, '.gff')
   }
 
+  if(acc == '10002'){
+    save(list = ls(), file = "tmp_workspace_10002.RData")  
+    stop()
+  }
 
   if(file.exists(file.own.merged)) return(NULL)
 
@@ -300,12 +304,6 @@ tmp <- foreach(acc = accessions, .packages = c('pannagram', 'crayon', 'rhdf5')) 
     gff.own.rest = gff.own[gff.own$V1 %in% paste0(acc, '_Chr', 1:5),]
   }
 
-  
-  if(acc == '10002'){
-    save(list = ls(), file = "tmp_workspace_10002.RData")  
-    stop()
-  }
-  
   # Check genes and mRNAs
   gff.g = gff.own.genes
   gff.m = gff.own.rest[gff.own.rest$V3 == 'mRNA',]

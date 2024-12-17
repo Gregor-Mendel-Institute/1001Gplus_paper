@@ -743,6 +743,12 @@ pos.beg = 12052416 - pos.shift
 pos.end = 12056127 + pos.shift
 
 
+i.chr = 1
+pos.shift = 1000
+pos.beg = 37345728 - pos.shift
+pos.end = 37394112 + pos.shift
+
+
 file.comb = paste0('/Volumes/Samsung_T5/vienn/test/a27/annot5/extra2_',i.chr,'_',i.chr,'.h5')
 path.chr = '/Volumes/Samsung_T5/vienn/genomes/pb_chromosomes/'
 gr.accs.e <- "accs/"
