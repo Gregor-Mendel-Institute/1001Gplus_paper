@@ -11,7 +11,7 @@ output: null_document
 
 path.base = '../../../'
 
-path.pannagram = paste(path.base, '../pannagram/', sep = '')
+path.pannagram = '/Users/annaigolkina/Library/CloudStorage/OneDrive-Personal/iglab/tools/pannagram/inst/'
 
 source(paste(path.pannagram, 'sim/sim_func.R', sep = ''))
 source(paste(path.pannagram, 'analys/graph_func.R', sep = ''))
@@ -61,7 +61,7 @@ library(ggnet)
 sunset <- colour("sunset")
 discrete_rainbow <- colour("discrete rainbow")
 
-path.analysis = paste(path.base, '02_analysis/04_sv/', sep = '')
+path.analysis = paste(path.base, '02_analysis_git/04_sv/', sep = '')
 path.work = paste(path.analysis, '01_data/', sep = '')
 path.figures = paste(path.analysis, '03_figures/', sep = '')
 

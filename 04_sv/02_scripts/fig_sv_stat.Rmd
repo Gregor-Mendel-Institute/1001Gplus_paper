@@ -1,0 +1,2999 @@
+---
+title: "Figures for SVs"
+output: null_document
+---
+
+# Setup
+
+## Libs
+```{r, message=FALSE}
+library(ggplot2)
+library(pannagram)
+library(gridExtra)
+```
+
+## Paths
+```{r, message=FALSE}
+
+path.base = '../../../'
+path.data = paste0(path.base, '01_data/03_annotation/02_pannagram/svs_v03_p01/')
+
+path.figures = '../03_figures/'
+
+path.genes = paste(path.base, '01_data/04_annotation/02_pannagram/genes/', sep = '')
+path.data.snps = paste(path.base, '02_analysis/06_snps/01_data/', sep = '')
+
+file.sv = 'sv_se.rds'
+file.sv.all = 'sv_all_events.rds'
+
+```
+
+
+## Reading
+```{r}
+
+sv.pos.beg = readRDS(paste0(path.data, 'sv_pangen_beg.rds'))
+sv.pos.end = readRDS(paste0(path.data, 'sv_pangen_end.rds'))
+
+sv.pos = readRDS(paste0(path.data, 'sv_pangen_pos.rds'))
+
+```
+
+
+
+# Reading
+```{r}
+sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+
+# Rename groups
+lev.replace = c('[1,10]', '(10,15]')
+lev.new = '[1,15]'
+
+s.levels = as.character(levels(sv.se$len.gr))
+s.levels = s.levels[!(s.levels %in% lev.replace)]
+s.levels = c(lev.new, s.levels)
+s.levels = gsub("e\\+03", "k", s.levels)
+
+sv.se$len.gr = as.character(sv.se$len.gr)
+sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
+sv.se$len.gr = gsub("e\\+03", "k", sv.se$len.gr)
+sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
+
+
+sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
+
+sv.pos.beg = read.table(paste(path.work, 'svs_all_beg_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
+sv.pos.end = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
+
+# sv.se = sv.se[sv.se$gr %in% sv.my.seb$gr,]
+```
+
+
+## Stat
+```{r}
+pokaz('Number of all SVs', nrow(sv.all))
+pokaz('Number of SVs len >= 15', sum(sv.all$len >= 15))
+pokaz('me-se', paste0(c(table(sv.all$single[sv.all$len >= 15])), collapse = ' '))
+```
+
+### TODO: Additional me-SV categories
+```{r}
+
+
+```
+
+
+### se-me: pie chart
+```{r}
+# Print stat
+res.len = c()
+
+thresholds = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13)
+thresholds = c(0,15,50,100, 1000)
+for(thresh in thresholds){
+  cnt = c(table(sv.all$single[sv.all$len >thresh]))
+  tmp = c(sum(sv.all$len >thresh), cnt, as.numeric(sprintf("%.2f",cnt[2]/cnt[1])))
+  res.len = rbind(res.len, tmp)
+}
+colnames(res.len) = c('all', 'me', 'se', 'ratio')
+rownames(res.len) = paste('len >', thresholds, 'bp', sep = '')
+rownames(res.len)[1] = 'all SVs'
+
+print(res.len)
+
+
+df = reshape2::melt(t(apply(res.len[,2:3], 1, function(x) x/sum(x))))
+df$group = factor(rep(rownames(res.len), 2), levels = rev(rownames(res.len)))
+
+ 
+# create nested pie chart using ggplot
+p = ggplot(df, aes(x = factor(group), y = value, fill = factor(Var2))) +
+          geom_col() +
+          scale_x_discrete(limits = rev(unique(df$group))) +
+          coord_polar("y")  + labs(fill = "") +
+  scale_fill_manual(values = c('#F48484', '#B5D5C5'),
+                    labels = c("meSV", "seSV")) +
+  theme_minimal() + 
+  geom_text(data = df[1:length(thresholds),], aes(x = factor(group), y = 0, 
+                                 # label = gsub(">=", "≥ ",group)), 
+                                 label = group), 
+            size = 3, hjust = -0.05, color = '#454545') +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = c(0.95, 0.95),
+            legend.justification = c(1, 1),
+            legend.background = element_blank(),
+            legend.box.background = element_blank()) +
+  geom_text(aes(label = round(value, 2)), position = position_stack(vjust = 0.5)) +
+  ylab('')+ xlab('')
+
+p
+
+p = p + theme(plot.margin = unit(c(-1, -1, -1, -1), "cm"))
+
+# 
+# pdf(paste(path.figures, 'sv_pie_chart.pdf', sep = ''), width = 4.5, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
+  
+  
+```
+
+
+# Correspondence between pangenome and accession coordinates
+```{r}
+i.chr = 5
+i.acc = 1
+df = data.frame(pangenome = sv.all$beg[sv.all$chr == i.chr], 
+                accession = sv.pos.beg[sv.all$chr == i.chr, i.acc])
+df = df[df[,2] != 0,]
+# plot(df[,1], df[,2])
+
+# Add regions of annotation
+
+cep.pos = read.table(paste(path.data.snps,'centr_bound.txt', sep = ''), header = 1)
+cep.pos.chr = cep.pos[cep.pos$chromosome == paste('Chr', i.chr, sep = ''),]
+
+
+n.portion = 5
+res1 = lm(accession ~ pangenome, data = df[1:round(nrow(df)/n.portion),])
+res2 = lm(accession ~ pangenome, data = df[nrow(df) - 1:round(nrow(df)/n.portion),])
+
+if((i.chr == 2) | (i.chr == 4)){
+  s.slopes = round(res2$coefficients[2], 2)
+  res1 = NULL
+} else {
+  s.slopes = paste(round(res1$coefficients[2], 2),
+                 round(res2$coefficients[2], 2), sep = ', ')
+}
+
+
+p <- ggplot(df, aes(pangenome, accession)) + 
+    annotate(geom = "rect",ymin = cep.pos.chr$start2, ymax = cep.pos.chr$stop2, xmin = -Inf, xmax = Inf,
+           fill = '#9AC5C7', alpha = 0.2) +
+    annotate(geom = "rect",ymin = cep.pos.chr$start3, ymax = cep.pos.chr$stop3, xmin = -Inf, xmax = Inf,
+           fill = '#176B87', alpha = 0.2) +
+    annotate(geom = "rect",ymin = cep.pos.chr$start, ymax = cep.pos.chr$stop, xmin = -Inf, xmax = Inf,
+           fill = '#176B87', alpha = 0.5) +
+  geom_point(size = 0.1) +
+  # geom_line(data = df[c(1, nrow(df)),], aes(pangenome, accession), color = 'red') + 
+  geom_abline(intercept = res1$coefficients[1], slope = res1$coefficients[2], 
+              color = '#594A4E', alpha = 0.4, size = 2.5) +
+  geom_abline(intercept = res2$coefficients[1], slope = res2$coefficients[2], 
+              color = '#594A4E', alpha = 0.4, size = 2.5) +
+  theme_minimal()+ theme(aspect.ratio=df[nrow(df),2]/df[nrow(df),1]) + 
+  # ggtitle(paste('Chromosome', i.chr)) + 
+  annotate("text", x = min(df$pangenome), y = max(df$accession), 
+             label = paste('Chromosome ', i.chr, 
+                           ', Slopes: ', s.slopes, sep = ''), 
+           hjust = 0, vjust = 0.8) +
+  xlab('Pangenome coordinate')
+
+if(i.acc != 1){
+  p = p + ylab(paste('Accession', colnames(sv.pos.beg)[i.acc], 'coordinate')) 
+} else {
+  p = p + ylab('Ref. genome coordinate')
+}
+
+p
+
+
+# PDF
+pdf(paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+          '_acc_',colnames(sv.pos.beg)[i.acc],'.pdf', sep = ''), 
+    width = 5, height = 3.75)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+# PNG
+png(filename = paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+                     '_acc_',colnames(sv.pos.beg)[i.acc],'.png', sep = ''), 
+    width = 5, height = 3.5, res = 300, units = 'in')
+print(p)
+dev.off()
+
+# saveRDS(p, paste(path.figures, 'sv_coord_corresp_chr_',i.chr,
+#                  '_acc_', colnames(sv.pos.beg)[i.acc], '.rds', sep = ''), 
+#         compress = F)
+
+p.corresp = p
+
+
+```
+
+
+
+
+# ME vs SE
+```{r}
+
+len.min = 15
+g <- ggplot(sv.all[sv.all$len > len.min,], aes(x=beg, fill = as.factor(single))) + 
+  geom_histogram(bins = 50, color='grey20') + theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) +
+  labs( x = "Pangenome coordinate", y = "Count") +
+  scale_fill_manual(values = c('#F48484', '#B5D5C5'),name = "", labels = c('meSV', 'seSV'))
+  
+g
+
+pdf(paste(path.figures, 'sv_all_chromosome_pangen_coord_len_',len.min,'bp.pdf', sep = ''), width = 6, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+## Combined with correspondence
+```{r}
+
+gx = list()
+for(len.min in c(1, 1000)){
+  df.plot = sv.all[(sv.all$len >= len.min) & (sv.all$chr == i.chr),]
+  g <- ggplot(df.plot, aes(x=beg, fill = as.factor(single))) + 
+    geom_histogram(bins = 50, color='grey20') + theme_minimal() + 
+    theme(strip.text.y = element_text(angle = 0)) +
+    labs( x = "Pangenome coordinate", y = "Count") +
+    annotate("text", x=-Inf, y=Inf, 
+           label=paste('min len =', len.min), hjust=-0.3, vjust=1, size = 2.5, color = 'grey20') +
+    scale_fill_manual(values = c('#F48484', '#B5D5C5'),name = "", labels = c('meSV', 'seSV'))
+  gx[[length(gx) +1]] = g
+}
+
+pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) , 
+          gx[[1]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + xlab('') + 
+            theme(legend.position = "none"), 
+          gx[[2]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + 
+            theme(legend.position = c(1, 1), 
+                  legend.justification = c(1, 0.1),
+                  legend.key.size = unit(0.3, "cm")),  
+          nrow=3, heights = c(1, 0.2, 0.2))
+
+pp
+
+pp = ggarrange(p.corresp + labs(x = NULL) + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) , 
+          gx[[2]] + scale_x_continuous(expand = c(0, 0),limits = c(0, 40000000)) + 
+            theme(legend.position = c(1, 1), 
+                  legend.justification = c(1, 0.4),
+                  legend.key.size = unit(0.3, "cm")),  
+          nrow=2, heights = c(1, 0.14))
+
+pp
+
+
+pdf(paste(path.figures, 'sv_comb_pangen_coord_chr_',i.chr,'.pdf', sep = ''), width = 5, height = 4)
+print(pp)
+dev.off()
+```
+
+
+
+
+## Pericentromeric pattern, varied length
+```{r}
+# i.chr = 5
+
+bin.width = seq(0, max(sv.all$end[sv.all$chr == i.chr]), 1000000)
+
+len.cutoffs = c(1, 15, 50, 100, 1000, Inf)
+df.bins.all = c()
+for(i in 1:(length(len.cutoffs) - 1)){
+  
+  df.bins <- sv.all[sv.all$chr == i.chr,] %>%
+    filter((len >= len.cutoffs[i]) & (len < len.cutoffs[i+1])) %>%
+    # Вычисляем ширину каждого бина
+    mutate(bins = cut(beg, breaks=bin.width)) %>%
+    # Группируем по хромосомам, бинам и значениям single, затем считаем количество
+    group_by(chr, bins, single) %>%
+    summarise(count = n()) %>%
+    ungroup()
+  
+  df.bins = as.data.frame(df.bins)
+  
+  for(j in 0:1){
+    df.bins[df.bins$single == j,'count'] <- df.bins[df.bins$single == j,'count'] / sum(df.bins[df.bins$single == j,'count'])
+  }
+  df.bins$len = paste('[', len.cutoffs[i], ',', len.cutoffs[i+1],')', sep = '')
+  
+  df.bins.all = rbind(df.bins.all, df.bins)
+}
+
+df.bins.all = df.bins.all[!is.na(df.bins.all$bins),]
+
+len.gr.unique = unique(df.bins.all$len)
+df.bins.all$len = factor(df.bins.all$len, levels = len.gr.unique)
+
+
+df.bins.all$alpha = as.numeric(df.bins.all$len) + 3
+df.bins.all$alpha = df.bins.all$alpha / max(df.bins.all$alpha)
+
+
+x.breaks = as.character(unique(df.bins.all$bins))
+x.labs = bin.width /10000000
+x.breaks = x.breaks[round(x.labs) == x.labs]
+x.labs = x.labs[round(x.labs) == x.labs] * 10
+
+custom_labeller <- as_labeller(c('1' = "seSV", 
+                                 '0' = "meSV"))
+
+p = ggplot(df.bins.all, aes(x=bins, y=count, group=len, alpha = len)) +
+  geom_line(aes(color=as.factor(single)), size=1) + # Добавляем ломаную линию
+  facet_grid(rows = vars(len), cols = vars(single), labeller = labeller(single = custom_labeller)) +
+  theme_minimal() +
+  labs(x = "", 
+       y = "Length") +
+  theme(legend.position = "none")  +
+  scale_alpha_manual(values = unique(df.bins.all$alpha)) +
+  scale_color_manual(values = c('#F48484', '#B5D5C5'), name = "", labels = c('meSV', 'seSV')) +
+  xlab('Pangenome position, Mbp') +
+  scale_x_discrete(breaks = x.breaks, labels = x.labs)
+
+p
+
+
+pdf(paste(path.figures, 'sv_pericentromeric_chr_',i.chr,'.pdf', sep = ''), width = 8, height = 5)
+print(p)
+dev.off()
+
+```
+
+
+
+# Length distribution
+
+## Hist all
+```{r}
+
+# hist(sv.se$freq.max)
+len.min = 15 
+
+cnt = as.matrix(table(sv.se$freq.max[sv.se$len>=len.min], sv.se$len.gr[sv.se$len>=len.min]))
+# cnt = cnt[-1,]
+# cnt = apply(cnt, 2, function(x) x / sum(x))
+
+cnt = rowSums(cnt)
+df = data.frame(Var1 = 1:length(cnt), value = cnt)
+g <- ggplot(df, aes(Var1, value)) +
+  annotate(geom = "rect",xmin = -Inf, xmax = 3, ymin = -Inf, ymax = Inf,
+           fill = 'grey60', alpha = 0.5) +
+    annotate(geom = "rect",xmin = 25, xmax = Inf, ymin = -Inf, ymax = Inf,
+           fill = 'grey60', alpha = 0.5) +
+    geom_line(size = 2) + theme_minimal() + 
+  theme(legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  geom_segment(aes(x = 1, y = 15000, xend = 27, yend = 15000), 
+               arrow = arrow(type = "closed", length = unit(0.2, "cm"), ends = "both"), 
+               color = "grey20") +
+  annotate("text", x = 2.5, y = 14000, label = "Singleton\ninsertions", hjust = "left", vjust = 1, color = "grey20", 
+           size = 2.5) +
+  annotate("text", x = 25.5, y = 14000, label = "Singleton\ndeletions", hjust = "right", vjust = 1, color = "grey20",
+           size = 2.5)+
+  viridis::scale_color_viridis() +
+  xlab('Frequency of presence') + 
+  ylab('Absolute number') +
+  theme(
+    panel.background = element_rect(fill = "white", color = 'white'),
+    plot.background = element_rect(fill = "white", color = 'white')
+  ) 
+g
+
+
+pdf(paste(path.figures, 'sv_freq_hist.pdf', sep = ''), width = 2.6, height = 1.7)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+## Hist by len-groups
+```{r}
+
+len.min = 15
+cols = colorRampPalette(colors = c('#82CD47','#66bb6a', '#3e8c4c', '#cca64e', 
+                                   '#b07046', '#dd925f', '#a6719d', '#e198d4', 'pink'),
+                        )(length(levels(sv.se$len.gr)))
+names(cols) <- levels(sv.se$len.gr)
+
+tbl = table(sv.se[(sv.se$len > len.min), c('len.gr', 'freq.max')])
+tbl = tbl[rowSums(tbl) != 0,]
+# tbl = apply(tbl, 2, function(x) x / sum(x))
+p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, color=len.gr)) +
+  geom_line(size = 2) +
+  # facet_grid(cols = vars(len.gr)) + 
+  facet_wrap(vars(len.gr), strip.position = "bottom", nrow = 1) + 
+ theme_minimal() + xlab('Frequency of presence') + ylab('Absolute number') + 
+  scale_color_manual(values=cols[names(cols) %in% rownames(tbl)],  
+                     name ='Indel Length (bp)') +
+  guides(color = FALSE) 
+p
+# 
+pdf(paste(path.figures, 'sv_freq_hist_length.pdf', sep = ''), width = 7, height = 3)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+tbl = table(sv.se[(sv.se$len < 100), c('len.gr', 'freq.max')])
+tbl = tbl[rowSums(tbl) != 0,]
+tbl.melt = reshape2::melt(tbl)
+p0 <- ggplot(data=tbl.melt[seq(1, nrow(tbl.melt),3),], aes(x=freq.max, y = value, color=len.gr)) +
+  geom_line(size = 2) +
+  facet_wrap(vars(len.gr), strip.position = "bottom", nrow = 1) + 
+ theme_minimal() + xlab('') + 
+  ylab('Absolute number') +  #width = 1.5
+  # ylab(NULL) +  #width = 1.5
+  scale_color_manual(values=cols[names(cols) %in% rownames(tbl)],  
+                     name ='Indel Length (bp)') +
+  # + theme(aspect.ratio=2/1)
+  guides(color = FALSE) + theme(
+    panel.background = element_rect(fill = "white", color = 'white'),
+    plot.background = element_rect(fill = "white")
+  )  
+
+p0
+
+
+
+pp = ggarrange(p0 + annotate(geom = "rect",ymin = -Inf, ymax = 11000, xmin = -Inf, xmax = Inf,
+           fill = 'grey60', alpha = 0.5),
+               p + ylab(NULL), 
+          ncol=2, widths = c(0.1, 1))
+
+pp
+
+
+pdf(paste(path.figures, 'sv_freq_hist_length_ext.pdf', sep = ''), width = 7, height = 3)
+print(pp)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+
+```
+
+## Bar-plots
+```{r}
+len.min = 15
+
+# tbl = table(sv.se[, c('len.gr', 'freq.max')])
+tbl = table(sv.se[(sv.se$len > len.min), c('len.gr', 'freq.max')])
+tbl = tbl[rowSums(tbl) != 0,]
+tbl = apply(tbl, 2, function(x) x / sum(x))
+p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, fill=len.gr)) +
+  geom_bar(stat="identity") + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') + scale_fill_manual(values=cols[names(cols) %in% rownames(tbl)],  name ='seSV len (bp)') +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0, 0))  +
+  theme(legend.key.size = unit(0.3, "cm"),
+        legend.position=c(1,1),legend.justification=c(1,1),
+        legend.direction="vertical",
+        legend.box="horizontal",
+        legend.box.just = c("top"), 
+        legend.background = element_rect(fill=alpha('white', 0.75)),
+        legend.margin = margin(2, 2, 2, 2))
+p
+
+pdf(paste(path.figures, 'sv_freq_length_composit.pdf', sep = ''), width = 3.5, height = 2.7)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+```{r}
+# Without normalisation
+tbl = table(sv.se[(sv.se$len > len.min), c('len.gr', 'freq.max')])
+tbl = tbl[rowSums(tbl) != 0,]
+# tbl = apply(tbl, 2, function(x) x / sum(x))
+p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, fill=len.gr)) +
+  geom_bar(stat="identity") + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') + scale_fill_manual(values=cols[names(cols) %in% rownames(tbl)],  name ='Indel Length (bp)')
+p
+# 
+# pdf(paste(path.figures, 'sv_freq_length_absolut.pdf', sep = ''), width = 6, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+
+```
+
+## Relative plots
+```{r}
+
+tbl = table(sv.se[, c('len.gr', 'freq.max')])
+tbl.ratio = tbl[-1,] / tbl[-nrow(tbl),]
+
+
+p <- ggplot(data=reshape2::melt(tbl.ratio), aes(x=freq.max, y = value, color=len.gr)) +
+  # geom_point() +
+  geom_smooth(method = "lm", se = FALSE)+
+  geom_smooth(se = FALSE, linetype = "dashed")+
+  theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') + 
+  scale_color_manual(values=cols[names(cols) %in% rownames(tbl)],  name ='Ratio in abundances',
+                     labels = paste(rownames(tbl[-1,]), rownames( tbl[-nrow(tbl),]), sep = '/'))
+p
+
+# pdf(paste(path.figures, 'sv_freq_ratio.pdf', sep = ''), width = 6, height = 4)
+# print(p)     # Plot 1 --> in the first page of PDF
+# dev.off()
+
+```
+
+
+# TE distribution
+```{r}
+min.te.len = 100
+te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
+cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
+names(cols) <- te.content.names
+
+sv.se$te = factor(sv.se$te, levels = c('noTE', 'isTE', 'isTEpart', 'hasTE', 'hasTEpart'))
+
+
+tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
+tbl = apply(tbl, 2, function(x) x / sum(x))
+
+df = reshape2::melt(tbl)
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+p <- ggplot() +
+  geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
+  theme_minimal() + 
+  scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
+  xlab('Frequency of presence') + ylab('')  +
+   theme(legend.justification = c(1, 0))
+p
+
+pdf(paste(path.figures, 'mob_freq_TE.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+# Without noTE
+
+tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
+tbl = tbl[row.names(tbl) != 'noTE',]
+tbl = apply(tbl, 2, function(x) x / sum(x))
+df = reshape2::melt(tbl)
+p <- ggplot() +
+  geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
+  xlab('Frequency of presence') + ylab('') +
+   theme(legend.justification = c(1, 0))
+p
+
+pdf(paste(path.figures, 'mob_freq_TE_only.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+# normalisation to the number of TE-containing sequences
+tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
+tbl.norm = colSums(tbl[row.names(tbl) != 'noTE',])
+tbl = apply(tbl, 1, function(x) x / tbl.norm)
+df = reshape2::melt(tbl)
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+p <- ggplot() +
+  geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
+  xlab('Frequency of presence') + ylab('') +
+   theme(legend.justification = c(1, 0))
+p
+
+p = p +   geom_segment(aes(x = 1, y = 3, xend = 27, yend = 3), 
+               arrow = arrow(type = "closed", length = unit(0.2, "cm"), ends = "both"), 
+               color = "black") +
+  annotate("text", x = 1, y = 2.9, label = "Singleton\ninsertions", hjust = "left", vjust = 1, color = "black") +
+  annotate("text", x = 27, y = 2.9, label = "Singleton\ndeletions", hjust = "right", vjust = 1, color = "black")
+
+pdf(paste(path.figures, 'mob_freq_TE_norm.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+# Absolute values
+tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
+# tbl = apply(tbl, 2, function(x) x / sum(x))
+
+df = reshape2::melt(tbl)
+# df$te = factor(df$te, levels=c("noTE", 'hasTEpart', 'isTEpart', 'isTE', 'hasTE'))
+p <- ggplot() +
+  geom_bar(data=df, aes(x=freq.max, y = value, fill=te),stat="identity") + 
+  theme_minimal() + 
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
+  xlab('Frequency of presence') + ylab('') +
+   theme(legend.justification = c(1, 0))
+p
+
+pdf(paste(path.figures, 'mob_freq_TE_absolute.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+## Pie distribution
+```{r}
+
+tbl = table(sv.se[(sv.se$len > min.te.len), c('te', 'freq.max')])
+tbl = rowSums(tbl)
+
+tbl
+
+df <- data.frame(category = names(tbl), value = tbl)
+df$p = paste(round(df$value / sum(df$value), 2) * 100, '%', sep = '')
+df$p = paste(df$value, '(', df$p, ')', sep = '')
+df$category = factor(df$category, levels = c('noTE', 'isTE', 'isTEpart', 'hasTE', 'hasTEpart'))
+p = ggplot(df, aes(x = "", y = value, fill = category)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y", start = tbl[1] / sum(tbl) * pi) +
+  theme_void() +
+  geom_text(aes(y = sum(value) - cumsum(value) + value/2, label = value), color = "black") +
+  scale_fill_manual(values=cols, name ='TE content') +
+  theme(legend.position = "none")
+
+p
+
+pdf(paste(path.figures, 'mob_pie_TE_absolute.pdf', sep = ''), width = 2, height = 2)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+
+## Violine length distribution in categories
+```{r}
+
+g = ggplot(sv.se[sv.se$len > 100,], aes(x = te, y = len, fill = te)) +
+  geom_violin() +
+  ylim(0, 25000) +
+    scale_fill_manual(values=cols, name ='TE content', 
+                    labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment')) +
+  
+  xlab('TE content') + ylab('Length, log10') +
+  scale_y_log10() +
+  geom_jitter(width = 0.2, size = 1, alpha = 0.05,stroke = 0) +
+  theme_minimal() +
+  guides(fill = FALSE) + theme(legend.position = "none") +
+  scale_x_discrete(labels = c('none', 'is complete', 'is fragment', 
+                               'contains complete', 'contains fragment'))
+
+g
+
+
+pdf(paste(path.figures, 'mob_te_length.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+# TE families
+```{r}
+head(sv.se)
+
+cnt = table(sv.se$fam[sv.se$fam!='']) 
+cnt = round(cnt / sum(cnt) * 100)
+te.of.interest = names(cnt)[cnt > 2]
+
+tbl = table(sv.se[sv.se$fam %in% te.of.interest, c('fam', 'freq.max')])
+
+# tbl = table(sv.se[(sv.se$type %in% te.of.interest) & (sv.se$te.content == 'isTE'), c('type', 'freq.max')])
+
+tbl = apply(tbl, 2, function(x) x / sum(x))
+# tbl = tbl[,-1]
+p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, fill=fam)) +
+  geom_bar(stat="identity", alpha = 0.9) + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') +
+  viridis::scale_fill_viridis(discrete = T, name = 'TE family')
+p
+
+pdf(paste(path.figures, 'mob_fam_freq_TE.pdf', sep = ''), width = 5, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+te.strategy = unique(sv.se$te)
+te.strategy = setdiff(te.strategy, 'noTE')
+for(i.strat in 1:length(te.strategy)){
+  tbl = table(sv.se[(sv.se$fam %in% te.of.interest) & (sv.se$te == te.strategy[i.strat]), c('fam', 'freq.max')])
+  tbl = apply(tbl, 2, function(x) x / sum(x))
+  # tbl = tbl[,-1]
+  p <- ggplot(data=reshape2::melt(tbl), aes(x=freq.max, y = value, fill=fam)) +
+    geom_bar(stat="identity", alpha = 0.9) + theme_minimal()  + xlab('Frequency of presence') + ylab('Proportion') +
+    viridis::scale_fill_viridis(discrete = T, name = 'TE family') + ggtitle(te.strategy[i.strat])
+  p
+  
+  pdf(paste(path.figures, 'mob_fam_freq_TE_',te.strategy[i.strat],'.pdf', sep = ''), width = 5, height = 4)
+  print(p)     # Plot 1 --> in the first page of PDF
+  dev.off()
+
+}
+
+
+te.strategy = unique(sv.se$te)
+te.strategy = setdiff(te.strategy, 'noTE')
+tbl.all = c()
+for(i.strat in 1:length(te.strategy)){
+  # tbl = table(sv.se[(sv.se$fam %in% te.of.interest) & (sv.se$te.content == te.strategy[i.strat]), c('fam', 'freq.max')])
+  
+  tbl = table(sv.se[(sv.se$te %in% te.strategy[i.strat]), c('fam', 'freq.max')])
+  
+  tbl[tbl == 0] = 0.5
+  tbl = as.data.frame(t(apply(tbl, 2, function(x) x / sum(x))))
+  tbl$freq = 1:nrow(tbl)
+  tbl$strat = te.strategy[i.strat]
+  tbl[,setdiff(colnames(tbl.all), colnames(tbl))] = 0
+  # tbl.all = rbind(tbl.all, tbl)
+  if(is.null(tbl.all)){
+    tbl.all = tbl
+  } else {
+    tbl.all = full_join(tbl.all, tbl, by = intersect(colnames(tbl.all), colnames(tbl)))
+  }
+}
+tbl.all[is.na(tbl.all)] = 1
+tbl.all[tbl.all == 0] = 1
+
+
+library(coda.base)
+ilr = coordinates(tbl.all[,te.of.interest], basis = 'ilr')
+
+pc <- prcomp(ilr,
+             center = TRUE,
+            scale. = TRUE)
+
+explained.variance <- pc$sdev^2 / sum(pc$sdev^2) * 100
+
+df = as.data.frame(pc$x)
+df$freq = tbl.all$freq
+df$strat = tbl.all$strat
+
+p <- ggplot(data=df, aes(x=PC1, y = PC2, color=strat, fill=strat)) +
+  stat_density_2d(geom = "polygon", aes(alpha = ..level.., fill = strat), show.legend = F, bins=6) +
+  geom_point(color='black', shape=21, size=2) + theme_minimal()  + 
+  xlab(sprintf("PC1 (%.2f%%)", explained.variance[1])) + 
+  ylab(sprintf("PC2 (%.2f%%)", explained.variance[2])) +
+  theme(legend.position = "none") +
+  # viridis::scale_fill_viridis(discrete = T) +
+  scale_fill_manual(values=cols, name ='TE content') +
+  scale_color_manual(values=cols, name ='TE content') + ylim(-3.5, 3.5)
+  # viridis::scale_color_viridis(discrete = T)
+p
+
+pdf(paste(path.figures, 'mob_fam_freq_TE_pca.pdf', sep = ''), width = 4, height = 4)
+print(p)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+
+# POSITIONS where SV happens
+## Read gene Annotation
+
+```{r}
+
+
+matching.files <- list.files(path = path.genes, pattern = "genes_v04_\\d+.gff$", full.names = TRUE)
+
+ann = c()
+gr.te = c()
+for(f in matching.files){
+  message(f)
+  ann.chr = read.table(f, stringsAsFactors = F)
+  ann.chr$gr = sapply(ann.chr$V9, function(s) strsplit(strsplit(s, ';')[[1]][1], '\\.')[[1]][1]) 
+  idx = grepl("te.coverage", ann.chr$V9)
+  ann.chr$te = 0
+  ann.chr$te[idx] = as.numeric(sapply(ann.chr$V9[idx], 
+                               function(s) strsplit(strsplit(s, 'te.coverage=')[[1]][2], ';')[[1]][1]))
+  ann = rbind(ann, ann.chr)
+  
+  # TE annogroups
+  gr.te = c(gr.te, unique(ann.chr$gr[ann.chr$te >= 0.5]))
+}
+
+ann = ann[!(ann$gr %in% gr.te),]
+
+ann$acc = sapply(ann$V1, function(s) strsplit(s, '_')[[1]][1])
+ann$chr = sapply(ann$V1, function(s) strsplit(s, '_Chr')[[1]][2])
+
+
+```
+
+
+
+### Extract singletons SVs
+```{r}
+
+sv.sin = sv.se[(sv.se$freq.max >= 25) | (sv.se$freq.max <= 3), ]
+sv.sin$insert = (sv.sin$freq.max < 20) * 1
+table(sv.sin$insert)
+
+sv.beg.init = read.table(paste(path.work, 'svs_all_beg_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
+sv.end.init = read.table(paste(path.work, 'svs_all_end_pos_v03.txt', sep = ''), stringsAsFactors = F, check.names = F)
+
+sv.beg = sv.beg.init[sv.sin$gr,]
+sv.end = sv.end.init[sv.sin$gr,]
+
+
+accessions = colnames(sv.beg)
+v <- sv.sin$len / 2
+N <- length(accessions)
+v.rep <- rep(v, N)
+sv.len.mx <- t(matrix(v.rep, ncol = length(v), byrow = TRUE))
+sv.sin.bin = (sv.sin[,accessions] > sv.len.mx) * 1
+rownames(sv.sin.bin) = sv.sin$gr
+
+sum(rowSums(sv.sin.bin) != sv.sin$freq.max)
+
+```
+
+
+## Detect "in gene" and "in exon"
+```{r}
+
+porop.gene = c()
+porop.exon = c()
+
+sv.sin$in.gene = 0
+sv.sin$in.exon = 0
+sv.sin$have.gene = 0
+for(acc in accessions){
+  if(acc == '0') next
+  print(acc)
+  for(i.chr in 1:5){
+    
+    ann.acc = ann[(ann$acc == acc) & (ann$chr == i.chr),]
+    ann.acc = ann.acc[order(ann.acc$V4),]
+    pos.gene = rep(0, 40000000)
+    pos.exon = rep(0, 40000000)
+    for(irow in 1:nrow(ann.acc)){
+      if(ann.acc$V3[irow] == 'exon'){
+        pos.exon[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
+      } else {
+        pos.gene[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
+      }
+    }
+    porop.gene = c(porop.gene, sum(pos.gene)/max(which(pos.gene == 1)))
+    porop.exon = c(porop.exon, sum(pos.exon)/max(which(pos.gene == 1)))
+    
+    idx.check.insert = (sv.sin$insert == 1) & (sv.sin.bin[,acc] == 0) & (sv.sin$chr == i.chr)
+    idx.check.delet = (sv.sin$insert == 0) & (sv.sin.bin[,acc] == 1) & (sv.sin$chr == i.chr)
+    
+    idx.interest = which(idx.check.insert | idx.check.delet)
+    
+    sv.acc = sv.sin[idx.interest,acc]
+    sv.acc.beg = sv.beg[idx.interest,acc]
+    sv.acc.end = sv.end[idx.interest,acc]
+    sv.acc.gr = sv.sin[idx.interest,'gr']
+    sv.acc[sv.acc.beg == 0] = -1
+    sv.acc[sv.acc.end == 0] = -1
+    
+    sv.in.gene = rep(0, length(idx.interest))
+    sv.in.exon= rep(0, length(idx.interest))
+    sv.have.gene= rep(0, length(idx.interest))
+    
+    for(irow in 1:length(sv.acc)){
+      if(sv.acc[irow] == -1) next
+      
+      gene.tmp = sum(pos.gene[sv.acc.beg[irow]:sv.acc.end[irow]])
+      exon.tmp = sum(pos.exon[sv.acc.beg[irow]:sv.acc.end[irow]])
+      
+      if((pos.gene[sv.acc.end[irow]] == 0) & (pos.gene[sv.acc.beg[irow]] == 0) & (gene.tmp > 0)){
+        sv.have.gene[irow] = 1
+      }
+      
+      # if(sv.acc[irow] == sv.insert[irow]) next
+      # print(sv.insert[irow])
+      
+      sv.in.gene[irow] = gene.tmp
+      sv.in.exon[irow] = exon.tmp
+      # if(sv.in.gene[irow] != 0) {
+      #   sv.in.exon[irow] = sum(pos.exon[sv.acc.beg[irow]:sv.acc.end[irow]])  
+      # }
+    }
+    
+    
+    sv.sin$in.gene[idx.interest] = sv.sin$in.gene[idx.interest] + (sv.in.gene > 0) * 1
+    sv.sin$in.exon[idx.interest] = sv.sin$in.exon[idx.interest] + (sv.in.exon > 0) * 1
+    sv.sin$have.gene[idx.interest] = sv.sin$have.gene[idx.interest] + (sv.have.gene > 0) * 1
+  }
+  
+}
+
+sv.sin$in.gene.init = sv.sin$in.gene
+sv.sin$in.exon.init = sv.sin$in.exon
+
+sv.sin$in.gene = (sv.sin$in.gene >= 1) * 1
+sv.sin$in.exon = (sv.sin$in.exon >= 1) * 1
+```
+
+
+### Tair10 proportions of genomes occupied with genes
+```{r}
+
+
+```
+
+
+
+## Fig: SVs in genes
+```{r}
+df.all = c()
+for(i in 0:1){
+  df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15),]
+  df = table(df$len.gr, df$in.gene)
+  df = df[rowSums(df)>0,]
+  df = reshape2::melt(df)
+  df$Var2 = as.numeric(df$Var2 + 2 * i)
+  df$inserion = i
+  df.all = rbind(df.all, df)
+}
+ins.names = c('deletion', 'insertion')
+df.all$inserion = ins.names[df.all$inserion +1]
+
+var.names = c('Deletion, no gene', 'Deletion in gene', 'Insertion, no gene', 'Insertion in gene')
+df.all$Var2 = factor(var.names[df.all$Var2 + 1], levels = var.names)
+
+
+cols = c('#BA94D1', '#7F669D', '#FFB26B', '#FF7B54')
+cols = c('#64B2CD', '#3C70A4', '#FFB26B', '#FF7B54')
+names(cols) = var.names
+
+g <- ggplot(df.all, aes(x=Var1, y=value, fill = Var2)) + 
+  geom_bar(stat="identity", position="dodge")+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  scale_fill_manual(values=cols, name ='Type of event') + ylab('Count') + 
+  xlab('SV length') +
+  theme(axis.text.x = element_text(angle = 20, vjust = 0.5, hjust=1)) +
+  theme(legend.position = c(1, 1), 
+        legend.justification = c(1, 1))
+
+g
+
+
+pdf(paste(path.figures, 'sv_annot_len_genes.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+## Fig: SVs in exons
+```{r}
+df.all = c()
+for(i in 0:1){
+  df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15) & (sv.sin$in.gene != 0),]
+  df = table(df$len.gr, df$in.exon)
+  df = df[rowSums(df)>0,]
+  
+  df = reshape2::melt(df)
+  df$Var2 = as.numeric(df$Var2 + 2 * i)
+  df$inserion = i
+  df.all = rbind(df.all, df)
+}
+ins.names = c('deletion', 'insertion')
+df.all$inserion = ins.names[df.all$inserion +1]
+
+var.names = c('Deletion in intron', 'Deletion in exon', 'Insertion in intron', 'Insertion in exon')
+df.all$Var2 = factor(var.names[df.all$Var2+1], levels = var.names)
+
+
+cols = c('#BA94D1', '#7F669D', '#FFB26B', '#FF7B54')
+cols = c('#64B2CD', '#3C70A4', '#FFB26B', '#FF7B54')
+names(cols) = var.names
+
+g <- ggplot(df.all, aes(x=Var1, y=value, fill = Var2)) + 
+  geom_bar(stat="identity", position="dodge")+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  scale_fill_manual(values=cols, name ='Type of event') + ylab('Count') + 
+  xlab('SV length') +
+  theme(axis.text.x = element_text(angle = 20, vjust = 0.5, hjust=1)) +
+    theme(legend.position = c(1, 1), 
+        legend.justification = c(1, 1))
+  
+g
+
+pdf(paste(path.figures, 'sv_annot_len_exons.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+## TE families in long insertions
+```{r}
+
+sv.tmp = sv.sin[(sv.sin$insert == 1) & (sv.sin$len >= 500),]
+
+head(sv.tmp)
+
+sv.tmp$comb = (sv.tmp$in.gene.init > 0) + (sv.tmp$in.exon.init>0)
+
+x = table(sv.tmp$comb, sv.tmp$te)
+
+x = table(sv.tmp$comb, sv.tmp$fam)
+x = x[,te.of.interest]
+
+xx <- t(apply(x, 1, function(row) row/sum(row)))
+
+xx_melted <- reshape2::melt(t(xx))
+
+
+p = ggplot(xx_melted, aes(as.factor(Var2), Var1, color=value, size=value)) + 
+  geom_point(shape=21, aes(fill=value), color = 'grey') + # shape=21 - это круглые кружочки с возможностью заполнения
+  scale_color_gradient(low = "white", high = "#FF7B54") +
+  scale_fill_gradient(low = "white", high = "#FF7B54") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 20, hjust = 0.5)) +
+  xlab('') + ylab('') +
+  scale_x_discrete(labels = c('Intergenic', 'Introns', 'Exons')) + guides(size=FALSE, fill=F, color=F) +
+  geom_text(data = xx_melted[xx_melted$value >= 0.1,], 
+              aes(as.factor(Var2), Var1, label = round(value, 2)), 
+              size = 2.5, color = 'black', 
+            nudge_x = 0.3,
+            nudge_y = 0.3) + ggtitle('Insertions of length >= 500') +
+    theme(plot.title.position = "plot",
+        plot.title = element_text(hjust = 0))
+
+p
+
+pdf(paste(path.figures, 'sv_annot_insertions.pdf', sep = ''), width = 2.5, height = 4)
+print(p )     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+## TE families in long deletions
+```{r}
+
+sv.tmp = sv.sin[(sv.sin$insert == 0) & (sv.sin$len >= 500),]
+
+head(sv.tmp)
+
+sv.tmp$comb = (sv.tmp$in.gene.init > 0) + (sv.tmp$in.exon.init>0)
+
+x = table(sv.tmp$comb, sv.tmp$te)
+
+x = table(sv.tmp$comb, sv.tmp$fam)
+x = x[,te.of.interest]
+
+xx <- t(apply(x, 1, function(row) row/sum(row)))
+
+xx_melted <- reshape2::melt(t(xx))
+
+
+p = ggplot(xx_melted, aes(as.factor(Var2), Var1, color=value, size=value)) + 
+  geom_point(shape=21, aes(fill=value), color = 'grey') + # shape=21 - это круглые кружочки с возможностью заполнения
+  scale_color_gradient(low = "white", high = "#3C70A4") +
+  scale_fill_gradient(low = "white", high = "#3C70A4") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 20, hjust = 0.5)) +
+  xlab('') + ylab('') +
+  scale_x_discrete(labels = c('Intergenic', 'Introns', 'Exons')) + guides(size=FALSE, fill=F, color=F) +
+  geom_text(data = xx_melted[xx_melted$value >= 0.1,], 
+              aes(as.factor(Var2), Var1, label = round(value, 2)), 
+              size = 2.5, color = 'black', 
+            nudge_x = 0.3,
+            nudge_y = 0.3) + ggtitle('Deletions of length >= 500') +
+    theme(plot.title.position = "plot",
+        plot.title = element_text(hjust = 0))
+
+p
+
+pdf(paste(path.figures, 'sv_annot_deletions.pdf', sep = ''), width = 2.5, height = 4)
+print(p )     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+
+
+### Fig:genes and TE
+```{r}
+df.all = c()
+for(te.type in unique(sv.sin$te)){
+  for(i in 0:1){
+    # df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15) & (sv.sin$in.gene != 0) & (sv.sin$te == te.type),]
+    # df = table(df$len.gr, df$in.exon)
+    
+    df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15)  & (sv.sin$te == te.type),]
+    df = table(df$len.gr, df$in.gene)
+    
+    
+    df = df[rowSums(df)>0,]
+    
+    df = reshape2::melt(df)
+    df$Var2 = as.numeric(df$Var2 + 2 * i)
+    df$inserion = i
+    df$te = te.type
+    df.all = rbind(df.all, df)
+  }
+}
+
+ins.names = c('deletion', 'insertion')
+df.all$inserion = ins.names[df.all$inserion +1]
+
+var.names = c('Deletion, no gene', 'Deletion in gene', 'Insertion, no gene', 'Insertion in gene')
+df.all$Var2 = factor(var.names[df.all$Var2+1], levels = var.names)
+
+
+cols = c('#BA94D1', '#7F669D', '#FFB26B', '#FF7B54')
+names(cols) = var.names
+df.all$value = log(df.all$value, 10)
+
+g <- ggplot(df.all, aes(x=Var1, y=value, fill = Var2)) + 
+  geom_bar(stat="identity", position="dodge")+
+  facet_grid(rows = vars(te)) +
+  theme_minimal() + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  # viridis::scale_fill_viridis() + 
+  # scale_y_continuous(trans='log10') +
+  scale_fill_manual(values=cols, name ='Type of event') + ylab('Count') + 
+  xlab('') +
+  theme(axis.text.x = element_text(angle = 20, vjust = 0.5, hjust=1))
+  
+g
+
+# pdf(paste(path.figures, 'sv_te_genes.pdf', sep = ''), width = 6, height = 4)
+# print(g)     # Plot 1 --> in the first page of PDF
+# dev.off()
+```
+
+### Fig:exons and TE
+```{r}
+df.all = c()
+for(te.type in unique(sv.sin$te)){
+  for(i in 0:1){
+    df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15) & (sv.sin$in.gene != 0) & (sv.sin$te == te.type),]
+    df = table(df$len.gr, df$in.exon)
+    
+    # df = sv.sin[(sv.sin$insert == i) & (sv.sin$len >15)  & (sv.sin$te == te.type),]
+    # df = table(df$len.gr, df$in.gene)
+    
+    
+    df = df[rowSums(df)>0,]
+    
+    df = reshape2::melt(df)
+    df$Var2 = as.numeric(df$Var2 + 2 * i)
+    df$inserion = i
+    df$te = te.type
+    df.all = rbind(df.all, df)
+  }
+}
+
+ins.names = c('deletion', 'insertion')
+df.all$inserion = ins.names[df.all$inserion +1]
+
+var.names = c('Deletion in intron', 'Deletion in exon', 'Insertion in intron', 'Insertion in exon')
+df.all$Var2 = factor(var.names[df.all$Var2+1], levels = var.names)
+
+
+cols = c('#BA94D1', '#7F669D', '#FFB26B', '#FF7B54')
+names(cols) = var.names
+df.all$value = log(df.all$value, 10)
+
+g <- ggplot(df.all, aes(x=Var1, y=value, fill = Var2)) + 
+  geom_bar(stat="identity", position="dodge")+
+  facet_grid(rows = vars(te)) +
+  theme_minimal() + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  # viridis::scale_fill_viridis() + 
+  # scale_y_continuous(trans='log10') +
+  scale_fill_manual(values=cols, name ='Type of event') + ylab('Count') + 
+  xlab('') +
+  theme(axis.text.x = element_text(angle = 20, vjust = 0.5, hjust=1))
+  
+g
+# 
+# pdf(paste(path.figures, 'sv_te_exons.pdf', sep = ''), width = 6, height = 4)
+# print(g)     # Plot 1 --> in the first page of PDF
+# dev.off()
+```
+
+
+
+## Distribution of length in exons and introns
+```{r}
+
+
+df = sv.sin[(sv.sin$len < 100) & (sv.sin$in.gene == 1), c('in.exon', 'len', 'insert')]
+df.s = apply(df, 1, paste, collapse = "_")
+cnt.df = table(df.s)
+
+df = stringr::str_split_fixed(names(cnt.df), "_", 3)
+df = data.frame(cnt = c(cnt.df), 
+                in.exon = as.numeric(df[,1]),
+                len = as.numeric(df[,2]),
+                insert = as.numeric(df[,3]))
+df$cnt = log(df$cnt)
+
+df$insert = c('deletion', 'insertion')[df$insert + 1]
+df$in.exon = c('in intron', 'in exon')[df$in.exon + 1]
+
+g <- ggplot(df, aes(x=len, y=cnt)) + 
+  
+   geom_segment(aes(x = len, y = 0, xend = len, yend = cnt), color = "#477892") +
+  geom_point()+
+  facet_grid(rows = vars(in.exon), cols = vars(insert)) +
+  theme_minimal() + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        # legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  # viridis::scale_fill_viridis() + 
+  # scale_y_continuous(trans='log10') +
+  scale_fill_manual(values=cols, name ='Type of event') + ylab('Count') + 
+  xlab('') 
+  
+g
+# 
+# idx = (sv.sin$in.exon == 0) & (sv.sin$len < 100) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0)
+# 
+# plot(log(table(sv.sin$len[idx])))
+
+pdf(paste(path.figures, 'sv_len_distr_in_genes.pdf', sep = ''), width = 6, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+## Detect positions along the gene body
+```{r}
+
+s.step = 100
+len.gene.min = 200
+
+sv.sin$pos.gene = 0
+sv.sin$pos.in.exon = 0
+sv.sin$gene.double = 0
+
+for(acc in accessions){
+  if(acc == '0') next
+  print(acc)
+  for(i.chr in 1:5){
+    
+    ann.acc = ann[(ann$acc == acc) & (ann$chr == i.chr),]
+    ann.acc = ann.acc[order(ann.acc$V4),]
+    ann.acc$len = abs(ann.acc$V4 - ann.acc$V5) + 1
+    ann.acc = ann.acc[ann.acc$len >= len.gene.min,]
+    pos.gene.plus = rep(0, 40000000)
+    pos.gene.mins = rep(0, 40000000)
+    pos.exon = rep(0, 40000000)
+    
+    pos.gene.start = rep(0, 40000000)
+    
+    for(irow in 1:nrow(ann.acc)){
+      if(ann.acc$V3[irow] == 'exon'){
+        pos.exon[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
+      } else if (ann.acc$V7[irow] == '+') {
+        pos.gene.plus[ann.acc$V4[irow]:ann.acc$V5[irow]] = 
+          ((ann.acc$V4[irow]:ann.acc$V5[irow]) - ann.acc$V4[irow] + 1) #/ ann.acc$len[irow]
+        pos.gene.start[ann.acc$V4[irow]] = 1
+      } else {
+        pos.gene.mins[ann.acc$V4[irow]:ann.acc$V5[irow]] = 
+          ((ann.acc$V5[irow]:ann.acc$V4[irow]) - ann.acc$V4[irow] + 1) #/ ann.acc$len[irow]
+        pos.gene.start[ann.acc$V5[irow]] = -1
+      }
+      
+    }
+
+    # Get positions of interest
+    idx.check.insert = (sv.sin$insert == 1) & (sv.sin.bin[,acc] == 0) & (sv.sin$chr == i.chr)
+    idx.check.delet = (sv.sin$insert == 0) & (sv.sin.bin[,acc] == 1) & (sv.sin$chr == i.chr)
+    
+    idx.interest = which(idx.check.insert | idx.check.delet)
+    
+    sv.acc = sv.sin[idx.interest,acc]
+    sv.acc.beg = sv.beg[idx.interest,acc]
+    sv.acc.end = sv.end[idx.interest,acc]
+    sv.acc.gr = sv.sin[idx.interest,'gr']
+    sv.acc[sv.acc.beg == 0] = -1
+    sv.acc[sv.acc.end == 0] = -1
+    
+    
+    #
+    sv.in.gene.plus = rep(0, length(idx.interest))
+    sv.in.gene.mins = rep(0, length(idx.interest))
+    sv.in.exon= rep(0, length(idx.interest))
+    for(irow in 1:length(sv.acc)){
+      if(sv.acc[irow] == -1) next
+      
+
+      exon.tmp = sum(pos.exon[sv.acc.beg[irow]:sv.acc.end[irow]])
+      if((pos.gene.plus[sv.acc.end[irow]] != 0) & (pos.gene.plus[sv.acc.beg[irow]] != 0)) {
+        # stop()
+        sv.in.gene.plus[irow] = mean(pos.gene.plus[sv.acc.beg[irow]:sv.acc.end[irow]])
+        if(exon.tmp > 0){
+          sv.in.exon[irow] = 1
+        }
+      }
+      
+      if((pos.gene.mins[sv.acc.end[irow]] != 0) & (pos.gene.mins[sv.acc.beg[irow]] != 0)){
+        sv.in.gene.mins[irow] = mean(pos.gene.mins[sv.acc.beg[irow]:sv.acc.end[irow]])
+        # stop()
+        if(exon.tmp > 0){
+          sv.in.exon[irow] = 1
+        }
+      }
+      
+      
+      gene.tmp = sum(pos.gene.plus[sv.acc.beg[irow]:sv.acc.end[irow]]) +
+        sum(pos.gene.mins[sv.acc.beg[irow]:sv.acc.end[irow]])
+      if(gene.tmp == 0){
+        # stop()
+        # before plus strand
+        i.range = sv.acc.beg[irow] + (0:s.step)
+        n.cover = sum(pos.gene.plus[i.range] > 0)
+        n.tss = min(c(0,which(pos.gene.start[i.range] == 1)))
+        if((n.cover > 0) & (n.tss != 0)){
+          sv.in.gene.plus[irow] = -n.tss  # diatnce to tss
+        } 
+        
+        # if((n.cover > 0) ) stop('plus')
+        
+        # after minus strand
+        i.range = sv.acc.beg[irow] + (-s.step:0)
+        if(i.range[1] < 0) next  # this proble doesn’t happen in "upper case", because we set up 4Mbp
+        n.cover = sum(pos.gene.mins[i.range] > 0)
+        n.tss = max(c(0,which(pos.gene.start[i.range] == -1)))
+        if((n.cover > 0)& (n.tss != 0)){
+          sv.in.gene.mins[irow] = -(s.step - n.tss + 1)
+        }
+        
+        # if((n.cover > 0) ) stop('mins')
+      }
+      
+    }
+    
+    x0 = sv.sin$pos.gene
+    
+    v = sv.in.gene.plus + sv.in.gene.mins
+    x = sv.sin$pos.gene[idx.interest]
+    x[x == 0] = v[x == 0]
+    v[v == 0] = x[v == 0]
+    x = (x + v) / 2
+    sv.sin$pos.gene[idx.interest] = x
+
+    # if(min(abs(sv.sin$pos.gene[sv.sin$pos.gene != 0])) == 0.5)
+    
+    sv.sin$gene.double[idx.interest] = ((sv.in.gene.plus * sv.in.gene.plus) > 0) * 1 + sv.sin$gene.double[idx.interest]
+    sv.sin$pos.in.exon[idx.interest] = (sv.in.exon > 0) * 1
+  }
+  
+}
+
+sv.sin$mod3 = sv.sin$len %% 3
+
+
+
+
+```
+
+
+### Plot
+```{r}
+sv.sin$s.pos.in.exon = c('intron', 'exon')[sv.sin$pos.in.exon+1]
+sv.sin$s.insert = c('deletion', 'insertion')[as.numeric(sv.sin$insert)+1]
+len.min  = 15
+g <- ggplot(sv.sin[(sv.sin$len <= len.min) & (sv.sin$pos.gene != 0) ,], aes(x=pos.gene)) + 
+  geom_histogram(bins = 30, fill='#ABCDCB',color='grey20', alpha=0.7) + theme_minimal() + 
+  facet_grid(rows = vars(mod3), cols = vars(interaction(s.pos.in.exon, s.insert)),
+             # scales = "free_y"
+             ) + 
+  theme(legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis() + 
+  ggtitle(paste('Length <= ', len.min)) + 
+  xlim(-100, 500) +
+  xlab('distance to the TSS') + 
+  xlab('distance to the TSS') + geom_vline(xintercept = 0, color = "#F4D160")
+  
+g
+
+
+pdf(paste(path.figures, 'sv_len_distr_in_genes_tss_exons_len_less_eq_15_abs.pdf', sep = ''), width = 7, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+sv.sin$s.pos.in.exon = c('intron', 'exon')[sv.sin$pos.in.exon+1]
+sv.sin$s.insert = c('deletion', 'insertion')[as.numeric(sv.sin$insert)+1]
+len.min  = 15
+g <- ggplot(sv.sin[(sv.sin$len <= len.min) & (sv.sin$pos.gene != 0) ,], aes(x=pos.gene)) + 
+  geom_histogram(bins = 30, fill='#ABCDCB',color='grey20', alpha=0.7) + theme_minimal() + 
+  facet_grid(rows = vars(mod3), cols = vars(interaction(s.pos.in.exon, s.insert)),
+             scales = "free_y"
+             ) + 
+  theme(legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis() + 
+  ggtitle(paste('Length <= ', len.min)) + 
+  xlim(-100, 500) +
+  xlab('distance to the TSS') + 
+  xlab('distance to the TSS') + geom_vline(xintercept = 0, color = "#F4D160")
+  
+g
+
+
+pdf(paste(path.figures, 'sv_len_distr_in_genes_tss_exons_len_less_eq_15.pdf', sep = ''), width = 7, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+### Local distributions
+```{r}
+len.min = 9
+sv.sin$pos.gene = round(sv.sin$pos.gene)
+g <- ggplot(sv.sin[(sv.sin$len <= len.min) & (sv.sin$pos.gene != 0) ,], aes(x=pos.gene)) + 
+  geom_bar(fill='#ABCDCB',color='grey20', alpha=0.7) + theme_minimal() + 
+  facet_grid(rows = vars(mod3), cols = vars(interaction(s.pos.in.exon, s.insert)),
+             # scales = "free_y"
+             ) + 
+  theme(legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis() + 
+  ggtitle(paste('Length <= ', len.min)) + 
+  # xlim(-100, 500) + 
+  xlim(-20, 20) + 
+  xlab('distance to the TSS') + geom_vline(xintercept = 0, color = "#F4D160")
+  
+g
+
+
+```
+
+# POSITIONS: SVs and TEs
+## Read
+```{r}
+path.edta = '../../../01_data_common/03_annot_repeat/'
+files.edta <- list.files(path = path.edta, pattern = "\\.gff$")
+
+ann.edta = c()
+for(f in files.edta){
+  pokaz(f)
+  ann.tmp = read.table(paste(path.edta, f, sep = ''), stringsAsFactors = F)
+  ann.tmp$acc = gsub("\\.gff$", "", f)
+  ann.edta = rbind(ann.edta, ann.tmp)
+}
+ann.edta$chr = as.numeric(sapply(ann.edta$V1, function(s) strsplit(s, 'Chr')[[1]][2]))
+ann.edta = ann.edta[!is.na(ann.edta$chr),]
+unique(ann.edta$chr)
+
+accessions = unique(ann.edta$acc)
+```
+
+## Processing
+```{r}
+# Remove Tair-10
+sv.sin = sv.se
+sv.sin$tair.bin = (sv.sin[,'0'] > sv.sin$len / 2) * 1
+sv.sin$freq.max = sv.sin$freq.max - (sv.sin$tair.bin == 1) * 1
+sv.sin$freq.min = sv.sin$freq.min - (sv.sin$tair.bin == 0) * 1
+sv.sin = sv.sin[sv.sin$freq.max != 0,]
+sv.sin = sv.sin[sv.sin$freq.min != 0,]
+# Check
+if(length(unique(sv.sin$freq.max + sv.sin$freq.min) )> 1) stop('WRONG number of accessions')
+
+# Remain only extremes
+sv.sin = sv.sin[(sv.sin$freq.max >= 24) | (sv.sin$freq.max <= 3), ]
+
+# Defive insertion-deletion
+sv.sin$insert = (sv.sin$freq.max < 20) * 1
+
+# Remain only TE-parts
+sv.sin = sv.sin[sv.sin$te == 'isTEpart',]
+
+
+sv.beg = sv.pos.beg[sv.sin$gr,]
+sv.end = sv.pos.end[sv.sin$gr,]
+
+
+sv.sin$in.edta = 0
+for(acc in accessions){
+  if(acc == '0') next
+  print(acc)
+  for(i.chr in 1:5){
+    
+    ann.acc = ann.edta[(ann.edta$acc == acc) & (ann.edta$chr == i.chr),]
+    ann.acc = ann.acc[order(ann.acc$V4),]
+    pos.edta = rep(0, 40000000)
+    for(irow in 1:nrow(ann.acc)){
+      pos.edta[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
+    }
+    
+    sv.sin.bin.acc = (sv.sin[,acc] >= sv.sin$len/2) * 1
+    
+    idx.check.insert = (sv.sin$insert == 1) & (sv.sin.bin.acc == 0) & (sv.sin$chr == i.chr)
+    idx.check.delet = (sv.sin$insert == 0) & (sv.sin.bin.acc == 1) & (sv.sin$chr == i.chr)
+    
+    idx.interest = which(idx.check.insert | idx.check.delet)
+    
+    sv.sin.bin.acc = sv.sin.bin.acc[idx.interest]
+    
+    sv.acc = sv.sin[idx.interest,acc]
+    sv.acc.beg = sv.beg[idx.interest,acc]
+    sv.acc.end = sv.end[idx.interest,acc]
+    sv.acc.gr = sv.sin[idx.interest,'gr']
+    sv.acc[sv.acc.beg == 0] = -1
+    sv.acc[sv.acc.end == 0] = -1
+    
+    sv.in.edta = rep(0, length(idx.interest))
+    
+    n.wind = 200
+    for(irow in 1:length(sv.acc)){
+      if(sv.acc[irow] == -1) next
+      
+      
+      if((pos.edta[sv.acc.end[irow]] == 1) | (pos.edta[sv.acc.beg[irow]] == 1)){
+        pos.tmp = c(max(1,(sv.acc.beg[irow] - n.wind)):sv.acc.beg[irow], sv.acc.end[irow]:(sv.acc.end[irow]+n.wind))
+        n.in.te.tmp = sum(pos.edta[pos.tmp])
+        
+        if(n.in.te.tmp > n.wind){
+          sv.in.edta[irow] = 1
+        }
+        
+      }
+      
+    }
+    
+    
+    sv.sin$in.edta[idx.interest] = sv.sin$in.edta[idx.interest] + (sv.in.edta > 0) * 1
+  }
+  
+}
+
+idx = (sv.sin$len < 500) & (sv.sin$te == 'isTEpart')
+idx =  (sv.sin$te == 'isTEpart')
+table(sv.sin$in.edta[idx] > 0, sv.sin$insert[idx])
+
+
+# > table(sv.sin$in.edta[idx] > 0, sv.sin$insert[idx])
+#        
+#                del    insertion
+#   not in TE    370    1207
+#   in TE       1024    653
+
+
+
+```
+
+
+
+# Along chromosomes
+##  insertions and deletions
+```{r}
+
+custom_labeller <- as_labeller(c('1' = "Insertions", 
+                                 '0' = "Deletions"))
+sv.sin$insert = as.character(sv.sin$insert)
+len.min = 1000
+g <- ggplot(sv.sin[(sv.sin$len >= len.min) ,], aes(x=end, fill = chr)) + 
+  geom_histogram(bins = 50, color='grey20', alpha=0.7) + theme_minimal() + 
+  facet_grid(rows = vars(chr), cols = vars(insert), labeller = labeller(insert = custom_labeller)) + 
+  theme(legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis() + 
+  ggtitle(paste('Length >= ', len.min))
+  
+g
+
+
+pdf(paste(path.figures, 'sv_chr_distr_indels_len_more_',len.min,'.pdf', sep = ''), width = 6, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+### with changing length
+```{r}
+i.chr = 1
+
+bin.width = seq(0, max(sv.sin$end[sv.sin$chr == i.chr]), 1000000)
+
+len.cutoffs = c(1, 15, 50, 100, 1000, Inf)
+df.bins.all = c()
+for(i in 1:(length(len.cutoffs) - 1)){
+  
+  df.bins <- sv.sin[sv.sin$chr == i.chr,] %>%
+    filter((len >= len.cutoffs[i]) & (len < len.cutoffs[i+1])) %>%
+    # Вычисляем ширину каждого бина
+    mutate(bins = cut(beg, breaks=bin.width)) %>%
+    # Группируем по хромосомам, бинам и значениям insert, затем считаем количество
+    group_by(chr, bins, insert) %>%
+    summarise(count = n()) %>%
+    ungroup()
+  
+  df.bins = as.data.frame(df.bins)
+  
+  for(j in 0:1){
+    df.bins[df.bins$insert == j,'count'] <- df.bins[df.bins$insert == j,'count'] / sum(df.bins[df.bins$insert == j,'count'])
+  }
+  df.bins$len = paste('[', len.cutoffs[i], ',', len.cutoffs[i+1],')', sep = '')
+  
+  df.bins.all = rbind(df.bins.all, df.bins)
+}
+
+df.bins.all = df.bins.all[!is.na(df.bins.all$bins),]
+
+len.gr.unique = unique(df.bins.all$len)
+df.bins.all$len = factor(df.bins.all$len, levels = len.gr.unique)
+
+
+df.bins.all$alpha = as.numeric(df.bins.all$len) + 3
+df.bins.all$alpha = df.bins.all$alpha / max(df.bins.all$alpha)
+
+
+x.breaks = as.character(unique(df.bins.all$bins))
+x.labs = bin.width /10000000
+x.breaks = x.breaks[round(x.labs) == x.labs]
+x.labs = x.labs[round(x.labs) == x.labs] * 10
+
+custom_labeller <- as_labeller(c('1' = "Insertion", 
+                                 '0' = "Deletion"))
+
+p = ggplot(df.bins.all, aes(x=bins, y=count, group=len, alpha = len)) +
+  geom_line(aes(color=as.factor(insert)), size=1) + # Добавляем ломаную линию
+  facet_grid(rows = vars(len), cols = vars(insert), labeller = labeller(insert = custom_labeller)) +
+  theme_minimal() +
+  labs(x = "", 
+       y = "Length") +
+  theme(legend.position = "none")  +
+  scale_alpha_manual(values = unique(df.bins.all$alpha)) +
+  scale_color_manual(values = c('#3C70A4', '#FF7B54'), name = "", labels = c('meSV', 'seSV')) +
+  xlab('Pangenome position, Mbp') +
+  scale_x_discrete(breaks = x.breaks, labels = x.labs)
+
+p
+
+
+pdf(paste(path.figures, 'sv_pericentromeric_chr_',i.chr,'_singletons.pdf', sep = ''), width = 8, height = 5)
+print(p)
+dev.off()
+
+```
+
+
+# Gene + SV
+## Detect genes in SVs
+```{r}
+len.gene.min = 200
+
+accessions = colnames(sv.se)[9:36]
+
+v <- sv.se$len / 2
+N <- length(accessions)
+v.rep <- rep(v, N)
+sv.len.mx <- t(matrix(v.rep, ncol = length(v), byrow = TRUE))
+sv.bin = (sv.se[,accessions] > sv.len.mx) * 1
+sv.beg.se = sv.beg.init[sv.se$gr,]
+sv.end.se = sv.end.init[sv.se$gr,]
+
+sv.se$have.gene = ''
+for(acc in accessions){
+  if(acc == '0') next
+  print(acc)
+  for(i.chr in 1:5){
+    
+    ann.acc = ann[(ann$acc == acc) & (ann$chr == i.chr),]
+    ann.acc = ann.acc[order(ann.acc$V4),]
+    ann.acc$len = abs(ann.acc$V4 - ann.acc$V5) + 1
+    ann.acc = ann.acc[ann.acc$len >= len.gene.min,]
+    pos.gene.plus = rep('', 40000000)
+    pos.gene.mins = rep('', 40000000)
+
+
+    
+    for(irow in 1:nrow(ann.acc)){
+      if(ann.acc$V3[irow] == 'exon'){
+        pos.exon[ann.acc$V4[irow]:ann.acc$V5[irow]] = 1
+      } else if (ann.acc$V7[irow] == '+') {
+        pos.gene.plus[ann.acc$V4[irow]:ann.acc$V5[irow]] = ann.acc$gr[irow]
+      } else {
+        pos.gene.mins[ann.acc$V4[irow]:ann.acc$V5[irow]] = ann.acc$gr[irow]
+      }
+      
+    }
+
+    # Get positions of interest  
+    # CHANGED HERE COMPARING WITH THE PREVIOUS
+    # Here we check if the current accession has the sequence
+    idx.interest = which((sv.bin[,acc] == 1) & (sv.se$chr == i.chr))
+    
+    sv.acc = sv.se[idx.interest,acc]
+    sv.acc.beg = sv.beg.se[idx.interest,acc]
+    sv.acc.end = sv.end.se[idx.interest,acc]
+    sv.acc.gr = sv.se[idx.interest,'gr']
+    sv.acc[sv.acc.beg == 0] = -1
+    sv.acc[sv.acc.end == 0] = -1
+    
+    #
+    sv.in.gene.plus = rep('', length(idx.interest))
+    sv.in.gene.mins = rep('', length(idx.interest))
+
+    for(irow in 1:length(sv.acc)){
+      if(sv.acc[irow] == -1) next
+      
+      gene.tmp = sum(pos.gene.plus[sv.acc.beg[irow]:sv.acc.end[irow]] != '')
+      if((pos.gene.plus[sv.acc.end[irow]] == '') & (pos.gene.plus[sv.acc.beg[irow]] == '') & (gene.tmp != 0)) {
+        
+        sv.in.gene.plus[irow] = paste0(setdiff(unique(pos.gene.plus[sv.acc.beg[irow]:sv.acc.end[irow]]), ''),collapse=',')
+      }
+      
+      gene.tmp = sum(pos.gene.mins[sv.acc.beg[irow]:sv.acc.end[irow]] != '')
+      if((pos.gene.mins[sv.acc.end[irow]] == '') & (pos.gene.mins[sv.acc.beg[irow]] == '') & (gene.tmp != 0)){
+        sv.in.gene.plus[irow] = paste0(setdiff(unique(pos.gene.mins[sv.acc.beg[irow]:sv.acc.end[irow]]), ''),collapse=',')
+      }
+    }
+    
+    # stop('all')
+    sv.se$have.gene[idx.interest] = paste(sv.se$have.gene[idx.interest], 
+                                          paste(sv.in.gene.plus,sv.in.gene.mins,sep=','), sep=',')
+    
+  }
+  
+}
+
+
+x0 = sv.se$have.gene
+sv.se$have.gene = stringr::str_sub(gsub(",+",",", sv.se$have.gene), start = 1, end = -2)
+
+
+sv.se$have.gene <- gsub('^,','',sv.se$have.gene)
+
+sv.se$have.gene.bin = (sv.se$have.gene != '') * 1
+
+idx.genes = which(sv.se$have.gene.bin == 1)
+sv.se$have.gene.cnt = 0
+for(i.sv in idx.genes){
+  tmp = unique(strsplit(sv.se[i.sv,]$have.gene, ',')[[1]])
+  sv.se$have.gene.cnt[i.sv] = length(tmp)
+  sv.se$have.gene[i.sv] = paste0(tmp, collapse = ',')
+  # if(length(tmp) > 1) stop()
+}
+
+```
+
+## Stat
+### How many genes jump together
+```{r}
+idx = which(sv.se$len >= 200)
+
+cnt.gene.together = table(sv.se$have.gene.cnt[idx])[-1]
+cnt.gene.together = cnt.gene.together[-length(cnt.gene.together)]
+cnt.gene.together = data.frame(cnt = c(cnt.gene.together), together= as.numeric(names(cnt.gene.together)))
+
+
+
+p = ggplot(cnt.gene.together, aes(x = together, y = 0)) + 
+  geom_point(aes(size = cnt), alpha = 0.7, color = "blue") + 
+  geom_text(aes(label = cnt), vjust = -4) +
+  labs(title = NULL, x = 'Number of genes in one SV', y = NULL) + 
+  scale_size_continuous(range = c(3, 30)) + 
+  scale_x_continuous(breaks = cnt.gene.together$together, limits = c(0, 6)) +  # Указываем все значения по оси X
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.ticks.y = element_blank(),  
+        axis.text.y = element_blank(),
+        panel.grid.minor = element_blank()) 
+p
+
+
+pdf(paste(path.figures, 'sv_gene_nember_in_svs.pdf', sep = ''), width = 3, height = 2)
+print(p)
+dev.off()
+
+```
+
+### Genes jump with TEs
+```{r}
+df.gene.with.te = table(sv.se$have.gene.bin[idx], sv.se$te[idx])
+
+df.gene.with.te <- reshape2::melt(df.gene.with.te, variable.name = "Category", value.name = "Value")
+
+ggplot(df.gene.with.te, aes(x = Var2, y = Value, fill = factor(Var1))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(fill = "Row Number") +
+  theme_minimal()
+
+te.content.names = c("noTE", "isTE", "hasTE", "hasTEpart", "isTEpart")
+cols = c('#D8D9CF', '#EB455F', '#7B6079', '#3C8DAD', '#79B773')
+names(cols) = te.content.names
+
+p = ggplot(df.gene.with.te[(df.gene.with.te$Var1 == 1)&(df.gene.with.te$Value > 5),], aes(x = "", y = Value, fill = Var2)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar(theta = "y") +
+  labs(fill = "seSV category \n (with genes)") +
+  theme_void() + scale_fill_manual(values = cols) +
+  geom_text(aes(label = round(Value, 2)), position = position_stack(vjust = 0.5)) 
+
+p
+
+pdf(paste(path.figures, 'sv_gene_with_te.pdf', sep = ''), width = 3, height = 2)
+print(p)
+dev.off()
+
+```
+### Frequencies of seSV
+```{r}
+
+tmp= table(sv.se$have.gene.bin[idx], sv.se$freq.max[idx])
+# tmp = tmp / rbind(colSums(tmp),colSums(tmp))
+df.gene.sv.freq = as.data.frame(reshape2::melt(tmp))
+
+p = ggplot(df.gene.sv.freq, aes(x = factor(Var2), y = value, fill = as.factor(Var1))) + 
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Frequency", y = "#", fill = "SVs") +
+  scale_fill_manual(values = c('#B9B4C7', '#352F44'), labels=c('without genes', 'with genes')) +
+  theme_minimal() +
+  theme(legend.position = c(0.5, 1), legend.justification = c(1, 1),
+          legend.background = element_rect(color = "grey90"))
+
+p
+
+
+pdf(paste(path.figures, 'sv_gene_sv_frequency.pdf', sep = ''), width = 5, height = 4)
+print(p)
+dev.off()
+
+
+tmp= table(sv.se$have.gene.bin[idx], sv.se$freq.max[idx])
+tmp = rbind(rowSums(tmp[,1:3]),rowSums(tmp[,25:27]))
+colnames(tmp) = c('Insertion', 'Deletion')
+tmp = tmp / cbind(rowSums(tmp),rowSums(tmp))
+df.gene.sv.freq = as.data.frame(reshape2::melt(tmp))
+
+df.gene.sv.freq
+p = ggplot(df.gene.sv.freq[df.gene.sv.freq$Var1 == 2,], 
+           aes(x = 1, y = value, fill = as.factor(Var2))) + 
+  geom_bar(stat = "identity", position = "stack") +
+  coord_polar(theta = "y") +
+  labs(x = "Frequency", y = "#", fill = "seSVs") +
+  scale_fill_manual(values = c('#B9B4C7', '#352F44')) +
+  geom_text(aes(x = 1.7, label = paste(round(value, 2),'%',sep='')), position = position_stack(vjust = 0.5)) +
+  theme_void() 
+p
+
+pdf(paste(path.figures, 'sv_gene_sv_frequency_pie.pdf', sep = ''), width = 3, height = 2)
+print(p)
+dev.off()
+
+
+```
+
+
+### Genes jump withTE families
+```{r}
+cnt.genes.te = table(sv.se$fam[idx],interaction(sv.se$te[idx], sv.se$have.gene.bin[idx]))
+cnt.genes.te <- reshape2::dcast(as.data.frame(cnt.genes.te), Var1 ~ Var2, value.var = "Freq")
+cnt.genes.te
+
+
+col.te = '#7B6079'
+col.tepart = '#3C8DAD'
+legend_labels <- c("TE" = col.te, "TEPart" = col.tepart)
+
+p = ggplot(cnt.genes.te, aes(x = hasTE.0, y = hasTE.1)) +
+    geom_point(aes(color = "TE"), size = 3) +  
+    geom_smooth(method = "lm", se = FALSE, aes(color = "TE"), alpha = 0.5) +
+    ggrepel::geom_text_repel(aes(label = Var1, color = "TE"), nudge_y = 0.5) +
+    geom_point(aes(x= hasTEpart.0, y = hasTEpart.1, color = "TEPart"), size = 3) +  
+    geom_smooth(aes(x= hasTEpart.0, y = hasTEpart.1, color = "TEPart"), method = "lm", se = FALSE, alpha = 0.5) +
+    ggrepel::geom_text_repel(aes(x= hasTEpart.0, y = hasTEpart.1, label = Var1, color = "TEPart"), nudge_y = 0.5) +
+    theme_minimal() +                            
+    labs(x = "# of SVs without gene", y = "# of SVs with a gene") +
+    scale_color_manual(name = NULL, values = legend_labels, labels = c('has TE', 'has TE part')) +
+  theme(legend.position = c(1, 1), legend.justification = c(1, 1),
+          legend.background = element_rect(color = "grey90"))
+p
+
+
+pdf(paste(path.figures, 'sv_gene_te_family.pdf', sep = ''), width = 5, height = 4)
+print(p)
+dev.off()
+```
+
+### LINE: Real genes, whole TEs
+```{r}
+idx.target = which((sv.se$te == 'hasTE')&(sv.se$have.gene.bin == 1)&(sv.se$fam == 'LINE'))
+
+sv.se$have.gene[idx.target]
+genes.target = strsplit(paste0(sv.se$have.gene[idx.target], collapse = ','), ',')[[1]]
+ann.target = unique(ann[(ann$gr %in% genes.target) & (ann$V3 == 'gene'),'V9'])
+gene.names = gsub(";.*$", "", gsub(".*;Name=(.*)$|^.*$", "\\1", ann.target))
+gene.names = unique(setdiff(gene.names, ''))
+gene.names
+
+
+ann[ann$gr == 'ID=AT1Gr10000005',]
+
+```
+
+### LINE: Real genes, whole TEs
+```{r}
+idx.target = which((sv.se$te == 'hasTEpart')&(sv.se$have.gene.bin == 1)&(sv.se$fam == 'LINE'))
+
+sv.se$have.gene[idx.target]
+genes.target = strsplit(paste0(sv.se$have.gene[idx.target], collapse = ','), ',')[[1]]
+ann.target = unique(ann[(ann$gr %in% genes.target) & (ann$V3 == 'gene'),'V9'])
+gene.names = gsub(";.*$", "", gsub(".*;Name=(.*)$|^.*$", "\\1", ann.target))
+gene.names = unique(setdiff(gene.names, ''))
+gene.names
+```
+
+```{r}
+i.sv = 289
+sv.se[i.sv,]
+acc = '10024'
+sv.beg.se[i.sv,acc]
+sv.end.se[i.sv,acc]
+
+```
+
+## SV: te and gene mapping
+```{r}
+max.chr.len = 40000000
+acc = '10024'
+pos.sv = rep(0,max.chr.len)
+pos.gene.plus = rep(0,max.chr.len)
+pos.gene.mins = rep(0,max.chr.len)
+
+
+```
+
+
+# Stop
+```{r}
+stop()
+```
+
+
+# AA of deletions and insertions
+```{r}
+path.fasta = '/Volumes/Samsung_T5/vienn/pb_chromosomes/'
+
+sv.sin.aa = matrix('-', nrow = nrow(sv.sin), ncol = ncol(sv.sin))
+colnames(sv.sin.aa) = colnames(sv.sin)
+for(i.chr in 1:5){
+
+  
+  idx.short.del = (sv.sin$len == 3) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  idx.short.ins = (sv.sin$len == 3) & (sv.sin$insert == 1) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  
+  sum(idx.short.del)
+  sum(idx.short.ins)
+  
+  idx.all = idx.short.del | idx.short.ins
+  
+  
+  for(acc in accessions){
+    message(paste('Accesion', acc))
+    file.genome = paste(path.fasta, acc, '_chr', 1, '.fasta',sep = '')
+    if(!file.exists(file.genome)) next
+    message('Reading')
+    genome = seqinr::read.fasta(file.genome)[[1]]
+    idx.acc = which(idx.all & sv.sin.bin[,acc] == 1)
+    pos1 = sv.beg[idx.acc, acc]
+    pos2 = sv.end[idx.acc, acc]
+    
+    idx.valid = (abs(pos1 - pos2) - 1) == 3
+    print(sum(!idx.valid))
+    
+    idx.acc = idx.acc[idx.valid]
+    pos1 = pos1[idx.valid]
+    pos2 = pos2[idx.valid]
+    
+    s.aa = sapply(1:length(pos1), function(i) {
+      tmp = pos1[i]:pos2[i]
+      tmp = tmp[-c(1, 5)]
+      tmp = genome[tmp]
+      if(pos1[i] > pos2[i]){
+        tmp = rev(seqinr::comp(tmp))
+      }
+      tmp = seqinr::getTrans(tmp)
+      return(tmp)
+    })
+    sv.sin.aa[idx.acc, acc] = s.aa
+    
+  }
+}
+
+sv.sin.aa = sv.sin.aa[,accessions]
+sv.sin.aa.cons = apply(sv.sin.aa, 1, function(x) {
+  x = x[x != '-']
+  if(length(x) == 0) return('-')
+  cnt = table(x)
+  y = names(cnt)[cnt == max(cnt)]
+  return(y[1])
+})
+```
+
+## Figure: aa disbalance
+```{r}
+df.aa = c()
+for(i.chr in 1:5){
+  
+  idx.short.del = (sv.sin$len == 3) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  idx.short.ins = (sv.sin$len == 3) & (sv.sin$insert == 1) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  
+  aa.cnt.del = table(sv.sin.aa.cons[idx.short.del])
+  aa.cnt.ins = table(sv.sin.aa.cons[idx.short.ins])
+  aa.common = intersect(names(aa.cnt.del), names(aa.cnt.ins))
+
+  df.tmp = data.frame(del = c(aa.cnt.del[aa.common]),
+                      ins = c(aa.cnt.ins[aa.common]),
+                      name = aa.common,
+                      chr = i.chr)
+  df.aa = rbind(df.aa, df.tmp)
+}
+
+
+g <- ggplot(df.aa, aes(x=del, y = ins)) + 
+  geom_point(aes(col = name)) + 
+  geom_smooth(method = 'lm', se = FALSE) +
+  geom_text( aes(x=del, y = ins + 0.2, label = name)) +
+  theme_minimal() + 
+  facet_grid(cols = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        legend.position='none',
+        strip.text.y = element_text(angle = 0)) 
+  
+g
+
+
+
+pdf(paste(path.figures, 'sv_aa_3.pdf', sep = ''), width = 25, height = 10)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+res.aa = c()
+for(i.chr in 1:5){
+  df.tmp = df.aa[df.aa$chr == i.chr,]
+  fit <- lm(df.tmp$del ~ df.tmp$ins)
+  res <- resid(fit)
+  res = data.frame(r = (res > 0) * 1, name = df.tmp$name)
+  # names(res) = df.tmp$name
+  
+  res.aa = rbind(res.aa, res)
+}
+
+x = tapply(res.aa[,1], res.aa[,2], sum)
+
+table(x)
+
+
+
+
+```
+## Distribution along chromosomes
+```{r}
+
+
+len.min = 50
+g <- ggplot(sv.se[sv.sin.aa.cons == 'I',], aes(x=end, fill = chr)) + 
+  geom_histogram(bins = 100, color='grey20', alpha=0.7) + theme_minimal() + 
+  facet_grid(rows = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        legend.position='none',
+        strip.text.y = element_text(angle = 0)) + 
+  viridis::scale_fill_viridis()
+  
+g
+
+```
+
+# Codons
+```{r}
+
+sv.sin.con = matrix('-', nrow = nrow(sv.sin), ncol = ncol(sv.sin))
+colnames(sv.sin.con) = colnames(sv.sin)
+for(i.chr in 1:5){
+
+  
+  idx.short.del = (sv.sin$len == 3) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  idx.short.ins = (sv.sin$len == 3) & (sv.sin$insert == 1) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  
+  sum(idx.short.del)
+  sum(idx.short.ins)
+  
+  idx.all = idx.short.del | idx.short.ins
+  
+  
+  for(acc in accessions){
+    message(paste('Accesion', acc))
+    file.genome = paste(path.fasta, acc, '_chr', 1, '.fasta',sep = '')
+    if(!file.exists(file.genome)) next
+    message('Reading')
+    genome = seqinr::read.fasta(file.genome)[[1]]
+    idx.acc = which(idx.all & sv.sin.bin[,acc] == 1)
+    pos1 = sv.beg[idx.acc, acc]
+    pos2 = sv.end[idx.acc, acc]
+    
+    idx.valid = (abs(pos1 - pos2) - 1) == 3
+    print(sum(!idx.valid))
+    
+    idx.acc = idx.acc[idx.valid]
+    pos1 = pos1[idx.valid]
+    pos2 = pos2[idx.valid]
+    
+    s.aa = sapply(1:length(pos1), function(i) {
+      tmp = pos1[i]:pos2[i]
+      tmp = tmp[-c(1, 5)]
+      tmp = genome[tmp]
+      if(pos1[i] > pos2[i]){
+        tmp = rev(seqinr::comp(tmp))
+      }
+      tmp = paste0(tmp, collapse = '')
+      return(tmp)
+    })
+    sv.sin.con[idx.acc, acc] = s.aa
+  }
+}
+
+
+sv.sin.cod = sv.sin.con[,accessions]
+sv.sin.cod.cons = apply(sv.sin.cod, 1, function(x) {
+  x = x[x != '-']
+  if(length(x) == 0) return('-')
+  cnt = table(x)
+  y = names(cnt)[cnt == max(cnt)]
+  return(y[1])
+})
+
+
+```
+
+# Figure
+```{r}
+
+df.aa = c()
+for(i.chr in 1:5){
+  
+  idx.short.del = (sv.sin$len == 3) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  idx.short.ins = (sv.sin$len == 3) & (sv.sin$insert == 1) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & (sv.sin$chr == i.chr)
+  
+  aa.cnt.del = table(sv.sin.cod.cons[idx.short.del])
+  aa.cnt.ins = table(sv.sin.cod.cons[idx.short.ins])
+  aa.common = intersect(names(aa.cnt.del), names(aa.cnt.ins))
+
+  df.tmp = data.frame(del = c(aa.cnt.del[aa.common]),
+                      ins = c(aa.cnt.ins[aa.common]),
+                      name = aa.common,
+                      chr = i.chr)
+  df.aa = rbind(df.aa, df.tmp)
+}
+
+
+g <- ggplot(df.aa, aes(x=del, y = ins)) + 
+  geom_point(aes(col = name)) + 
+  geom_smooth(method = 'lm', se = FALSE) +
+  geom_text( aes(x=del, y = ins + 0.2, label = name)) +
+  theme_minimal() + 
+  facet_grid(cols = vars(chr)) + 
+  theme(panel.border = element_rect(colour = "black", fill=NA),
+        legend.position='none',
+        strip.text.y = element_text(angle = 0)) 
+  
+g
+
+
+
+
+
+pdf(paste(path.figures, 'sv_cod_3.pdf', sep = ''), width = 25, height = 10)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+
+```{r}
+
+s.aa = 'L'
+idx.short.del = (sv.sin$len == 3) & (sv.sin$insert == 0) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & 
+  (sv.sin.aa.cons == s.aa)
+idx.short.ins = (sv.sin$len == 3) & (sv.sin$insert == 1) & (sv.sin$in.gene != 0) & (sv.sin$in.exon == 1) & 
+  (sv.sin.aa.cons == s.aa)
+
+l.ins = sv.sin.cod.cons[idx.short.ins]
+l.del = sv.sin.cod.cons[idx.short.del]
+  
+
+table(l.ins)
+table(l.del)
+
+```
+
+# Compare with Sebastian
+```{r}
+
+path.sebastian = '/Volumes/Samsung_T5/vienn/work_sebastian/'
+path.sv = '/Volumes/Samsung_T5/vienn/work_sv/'
+min.len = 15
+
+# Read Sebastian's annotation
+sv.seb = read.table(paste(path.sebastian, 'filt.bed', sep = ''), stringsAsFactors = F)
+sv.seb$d = (sv.seb$V3 - sv.seb$V2) + 1  # This is debatable
+sv.seb = sv.seb[sv.seb$d >= min.len, ]
+
+# Read Anna's annotation
+sv.my = read.table(paste(path.sv, 'svs_v03.gff', sep = ''), stringsAsFactors = F)
+sv.my$d = sv.my$V5 - sv.my$V4 - 1  # This is correct
+sv.my = sv.my[sv.my$d >= min.len,]
+sv.my = sv.my[sv.my$V3 != 'multi',]
+
+# Make comparable names of chromosomes
+sv.seb$V1 = gsub("22001_Chr(\\d)_mod2", "220011_Chr\\1", sv.seb$V1)
+sv.seb$V1 = gsub("TAIR10_Chr", "0_Chr", sv.seb$V1)
+acc.chr.seb = unique(sv.seb$V1)
+acc.chr.seb = intersect(acc.chr.seb, sv.my$V1)
+
+# Coverage of Sebastian's seSVs are in my SVs
+sv.my$seb = 0
+for(as.comb in acc.chr.seb){
+  print(as.comb)
+  sv.seb.tmp = sv.seb[sv.seb$V1 == as.comb,]
+  # sv.seb.tmp = sv.seb.tmp[order(sv.seb.tmp$V2),]
+  
+  # Find positions, which are covered by Sebastian's seSVs
+  pos = rep(0, 40*10^6)
+  for(i in 1:nrow(sv.seb.tmp)){
+    pos[sv.seb.tmp$V2[i]:sv.seb.tmp$V3[i]] = 1
+  }
+  
+  sv.my.tmp = sv.my[sv.my$V1 == as.comb,]
+  for(i in 1:nrow(sv.my.tmp)){
+    sv.my.tmp$seb[i] = sum(pos[sv.my.tmp$V4[i]:sv.my.tmp$V5[i]])
+  }
+  sv.my[sv.my$V1 == as.comb,'seb'] = sv.my.tmp$seb
+}
+
+table(sv.my$seb != 0)
+sv.my.seb = sv.my[sv.my$seb != 0,]
+sv.my.seb$gr = gsub("ID=(\\S+)\\.\\d+.*", "\\1", sv.my.seb$V9)
+
+
+# Coverage of Sebastian's seSVs are in my SVs
+sv.seb$anna = 0
+for(as.comb in acc.chr.seb){
+  print(as.comb)
+  sv.my.tmp = sv.my[sv.my$V1 == as.comb,]
+  # Find positions, which are covered by Anna's seSVs
+  pos = rep(0, 40*10^6)
+  for(i in 1:nrow(sv.my.tmp)){
+    pos[sv.my.tmp$V4[i]:sv.my.tmp$V5[i]] = 1
+  }
+  
+  sv.seb.tmp = sv.seb[sv.seb$V1 == as.comb,]
+  for(i in 1:nrow(sv.seb.tmp)){
+    sv.seb.tmp$seb[i] = sum(pos[sv.seb.tmp$V2[i]:sv.seb.tmp$V3[i]])
+  }
+  sv.seb[sv.seb$V1 == as.comb,'anna'] = sv.seb.tmp$seb
+}
+
+table(sv.seb$anna != 0)
+
+
+
+```
+
+
+
+
+## Get alignment
+```{r}
+
+pos = 504918:531274
+s = s.init[pos,]
+f.fasta = paste(path.work,'tmp.fasta', sep = '')
+print('Write')
+write('', file=f.fasta, append=F)
+for(i in 1:ncol(s)){
+  print(i)
+  s.tmp = unlist(s[,i])
+  write(paste('>seq', i, sep = ''), file=f.fasta, append=T)
+  write(toupper(paste0(s.tmp, collapse = '')), file=f.fasta, append=T)
+}
+
+```
+
+## Plot alignment
+```{r}
+
+
+path.msa = '/Volumes/Samsung_T5/vienn/work_sebastian/'
+file.msa = paste(path.msa, 'tmp.fasta', sep = '')
+seqs <- Biostrings::readDNAStringSet(file.msa)
+seqs.mx = matrix('', nrow=length(seqs), ncol=length(seqs[[1]]))
+for(i in 1:length(seqs)){
+  s = toupper(strsplit(as.character(seqs[[i]]), '')[[1]])
+  seqs.mx[i,] = s
+}
+
+# Преобразование данных в датафрейм
+df <- reshape2::melt(seqs.mx)
+# df$Var1 = factor(df$Var1, levels = rev(rownames(seqs.mx)))
+# df$Var2 = as.numeric(df$Var2)
+
+
+g.msa = ggplot(df, aes(x = Var2, y = Var1, fill = value)) + 
+  geom_tile() +
+  scale_fill_manual(values = c("A" = "#8ACD9D", "C" = "#EE7571", "G" = "#7E9CC8", "T" = "#FFD97C", '-'='#EEEDEF')) +
+  theme_bw() + 
+  # xlim(0, ncol(seqs.mx)+1) + 
+  scale_x_continuous(limits = c(0, ncol(seqs.mx)+1), expand = c(0, 0)) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_blank()) + ylab('') + 
+  theme(legend.position = "none")
+
+
+# g.msa
+
+
+
+pdf(paste(path.msa, 'cmp1.pdf', sep = ''), width = 25, height = 4)
+print(g.msa)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+# Centromere sizes
+```{r}
+
+path.work = '../cmp_all/'
+cen.ref = c(14364752,3002775,12674550,2919690,11668616,15750321,3735247,14674767,4011692,12082583)
+# cen.ref = c(14286477,3028691,12761403,2838148,11861023,14765400,3809009,14513324,4410746,13171170)
+i.acc = 1
+14286477
+
+n.acc = 28
+n.chr = 5
+cen.len = c()
+for(i.chr in 1:n.chr){
+  message(i.chr)
+  file.aln = paste(path.work, 'val_common_chr_',i.chr,'_ref_add.rds', sep = '')
+  v = readRDS(file.aln)
+  v.pres = rowSums(v[,1:n.acc] != 0)
+  
+  idx.cen.beg = max(which((v[,i.acc] <= cen.ref[i.chr]) & (v[,i.acc] != 0) & (v.pres == n.acc)))
+  idx.cen.end = min(which((v[,i.acc] >= cen.ref[i.chr + n.chr]) & (v[,i.acc] != 0) & (v.pres == n.acc)))
+
+  
+  cen.len = rbind(cen.len,v[idx.cen.end,] - v[idx.cen.beg,])
+  
+}
+rownames(cen.len) = NULL
+saveRDS(cen.len, paste(path.work, 'chromosomal_length.rds', sep = ''))
+
+
+```
+## Plot
+```{r}
+library(ggplot2)
+
+path.work='/Volumes/Samsung_T5/vienn/work_sv/'
+cen.len = readRDS(paste(path.work, 'chromosomal_length.rds', sep = ''))
+cen.len = cen.len[,1:28]
+rownames(cen.len) = paste('cen', 1:nrow(cen.len), sep = '_')
+cen.len = ceiling(cen.len / 100000) / 10
+
+# Преобразование данных в датафрейм
+df <- reshape2::melt(as.matrix(cen.len))
+df$Var1 = factor(df$Var1, levels = rev(rownames(cen.len)))
+df$Var2 = factor(df$Var2, levels = colnames(cen.len))
+
+sv.type = c('meSE', 'seSV')
+
+g = ggplot(df, aes(x = Var2, y = Var1, fill = value)) + 
+  geom_tile() +
+  scale_fill_gradientn(colors = c("#564A4A", "#4AA96C", "#9FE6A0", "#F8A488", "#F55C47")) +
+  theme_bw() + 
+  # xlim(0, ncol(seqs.mx)+1) + 
+  theme(panel.grid = element_blank(),
+        panel.border = element_blank()) + ylab('')   +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  labs(fill = "Cen len, Mbp") +
+   theme(legend.title = element_text(angle = 90)) +
+  guides(colour = guide_legend(title.position = "right")) +
+  xlab('')
+  # theme(legend.position = "none")
+g
+
+```
+
+
+
+# For grant
+## Reading
+```{r}
+sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stringsAsFactors = F)
+```
+
+## Statisticks
+```{r}
+
+
+sv.se = readRDS(paste(path.work, file.sv, sep = ''))
+
+lev.replace = c('[1,10]', '(10,15]')
+lev.new = '[1,15]'
+
+s.levels = as.character(levels(sv.se$len.gr))
+s.levels = s.levels[!(s.levels %in% lev.replace)]
+s.levels = c(lev.new, s.levels)
+
+sv.se$len.gr = as.character(sv.se$len.gr)
+sv.se$len.gr[sv.se$len.gr %in% lev.replace] = lev.new
+sv.se$len.gr = factor(sv.se$len.gr, levels = s.levels)
+
+
+sv.all = readRDS(paste(path.work, file.sv.all, sep = ''))
+
+min.len = 100
+sum(sv.all$len >= min.len)
+sum(sv.all$len < min.len)
+table(sv.all$single[sv.all$len >= min.len])
+
+mean(sv.all$len[(sv.all$len >= min.len) & (sv.all$single == 1)])
+mean(sv.all$len[(sv.all$len >= min.len) & (sv.all$single == 0)])
+
+sum(sv.se$len >= 100)
+
+sv.se = sv.se[sv.se$gr %in% sv.my.seb$gr,]
+
+sv.se.ins = sv.se[(sv.se$len >= min.len)&(sv.se$freq.max == 1),]
+sv.se.ins.bin = sv.bin[sv.se.ins$gr,]
+
+
+sv.se.del = sv.se[(sv.se$len >= min.len)&(sv.se$freq.min == 1),]
+sv.se.del.bin = sv.bin[sv.se.del$gr,]
+
+colSums(sv.se.ins.bin == 1)
+colSums(sv.se.del.bin == 0)
+
+```
+
+
+
+## Common amount between accessions
+(no cluster)
+```{r}
+path.work = '../cmp_all/'
+n.chr = 5
+
+n.rep = 20 
+
+cen.ref = c(14364752,3002775,12674550,2919690,11668616,15750321,3735247,14674767,4011692,12082583)
+i.acc = 1
+n.acc = 28
+
+
+for(i.chr in 1:n.chr){
+  file.v = paste(path.work, 'val_common_chr_',i.chr,'_ref_add.rds', sep = '')
+  v = readRDS(file.v)
+  v.pres = rowSums(v[,1:n.acc] != 0)
+  
+  idx.cen.beg = max(which((v[,i.acc] <= cen.ref[i.chr]) & (v[,i.acc] != 0) & (v.pres == n.acc)))
+  idx.cen.end = min(which((v[,i.acc] >= cen.ref[i.chr + n.chr]) & (v[,i.acc] != 0) & (v.pres == n.acc)))
+# 
+#   v.beg = v[1:idx.cen.beg,]
+#   v.end = v[idx.cen.end:nrow(v),]
+#   
+#   rm(v)
+  
+  gc()
+  
+  p = c()
+  for(i.rep in 1:n.rep){
+    print(i.rep)
+    i.accs = sample(n.acc, 2, replace = F)
+    v.pres = rowSums(v[1:idx.cen.beg,i.accs] != 0)
+    cnt = table(v.pres)
+    p = rbind(p, c(cnt[3] / (cnt[2]+cnt[3]), cnt[3]/v[idx.cen.beg,i.accs[1]], 
+                   cnt[3]/v[idx.cen.beg,i.accs[2]] ))
+    print(p)
+  }
+  
+}
+
+```
+
+
+
+# Saturation analysis
+## seSVs - all lengths
+```{r}
+
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+
+sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stringsAsFactors = F)
+sv.se.bin = sv.bin[sv.se$gr,]
+
+# sv.se.bin = sv.se.bin[sv.se$freq.max %in% c(1,2,3),]
+# sv.se.bin = sv.se.bin[sv.se$freq.max %in% c(25,26,27),]
+
+sv.sat = sv.se.bin
+sv.sat.len = sv.se$len
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+    y = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, y, i.rep))
+  }
+  # stop()
+}
+
+df.sat.all = data.frame(df.sat)
+colnames(df.sat.all) = c('n.gen', 'len.sv', 'n.sv', 'i.rep')
+
+g <- ggplot(df.sat.all, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_number.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+g <- ggplot(df.sat.all, aes(x=n.gen, y=len.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Length of SVs')  
+  
+g
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_length.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+## seSVs >= 100
+```{r}
+min.len = 100
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+
+sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stringsAsFactors = F)
+sv.se.bin = sv.bin[sv.se$gr,]
+
+sv.sat = sv.se.bin[sv.se$len >= min.len,]
+sv.sat.len = sv.se$len[sv.se$len >= min.len]
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+    y = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, y, i.rep))
+  }
+  # stop()
+}
+
+
+df.sat.100 = data.frame(df.sat)
+colnames(df.sat.100) = c('n.gen', 'len.sv', 'n.sv', 'i.rep')
+
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_number100.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=len.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Length of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_length100.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+### Insertions
+```{r}
+
+min.len = 100
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+
+sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stringsAsFactors = F)
+sv.se.bin = sv.bin[sv.se$gr,]
+
+sv.sat = sv.se.bin[(sv.se$len >= min.len) & (sv.se$freq.max %in% c(1,2,3)),]
+sv.sat.len = sv.se$len[(sv.se$len >= min.len) & (sv.se$freq.max %in% c(1,2,3))]
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+    y = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, y, i.rep))
+  }
+  # stop()
+}
+
+
+df.sat.100 = data.frame(df.sat)
+colnames(df.sat.100) = c('n.gen', 'len.sv', 'n.sv', 'i.rep')
+
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_number100_ins.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=len.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Length of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_length100_ins.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+```
+
+### Deletion
+```{r}
+
+min.len = 100
+len.gr = unique(sv.se$len.gr)
+n.rep = 20  # number of repetitions
+
+sv.bin = read.table('/Volumes/Samsung_T5/vienn/work_sv/svs_se_bin_v03.txt', stringsAsFactors = F)
+sv.se.bin = sv.bin[sv.se$gr,]
+
+sv.sat = sv.se.bin[(sv.se$len >= min.len) & (sv.se$freq.max %in% c(25,26,27)),]
+sv.sat.len = sv.se$len[(sv.se$len >= min.len) & (sv.se$freq.max %in% c(25,26,27))]
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    x = sum(sv.sat.len[(rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0)])
+    y = sum((rowSums(sv.sat.rep) != n.gen) & (rowSums(sv.sat.rep) != 0))
+    if(x == 0) stop()
+    # print(c(i.accs, x))
+    df.sat = rbind(df.sat, c(n.gen, x, y, i.rep))
+  }
+  # stop()
+}
+
+
+df.sat.100 = data.frame(df.sat)
+colnames(df.sat.100) = c('n.gen', 'len.sv', 'n.sv', 'i.rep')
+
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_number100_del.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+g <- ggplot(df.sat.100, aes(x=n.gen, y=len.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Length of SVs')  
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_length100_del.pdf', sep = ''), width = 4, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+```
+
+
+
+### together
+```{r}
+
+
+
+df1 = df.sat.100[,c('n.gen',  'len.sv',  'i.rep')]
+df2 = df.sat.100[,c('n.gen',  'n.sv', 'i.rep')]
+colnames(df1) = c('n.gen', 'n', 'i.rep')
+colnames(df2) = c('n.gen', 'n', 'i.rep')
+
+df1$type = 'length'
+df2$type = 'number'
+
+df.sat.cumm = rbind(df1, df2)
+
+for(itype in unique(df.sat.cumm$type)){
+  df.sat.cumm[df.sat.cumm$type == itype,'n'] = df.sat.cumm[df.sat.cumm$type== itype,'n'] -
+    min(df.sat.cumm[df.sat.cumm$type== itype,'n'])
+  df.sat.cumm[df.sat.cumm$type== itype,'n'] = df.sat.cumm[df.sat.cumm$type== itype,'n']/
+    max(df.sat.cumm[df.sat.cumm$type== itype,'n'])
+}
+
+
+
+
+g <- ggplot(df.sat.cumm, aes(x=n.gen, y=n, color = type)) + 
+  geom_point(alpha = 0.5)+geom_smooth(method = "loess", se = FALSE) +
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # facet_grid(rows = vars(type)) +
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Normalised values')  +
+  scale_color_manual(values = c("#3AB0FF", "#F87474"))
+  
+g
+
+
+path.satur = '/Volumes/Samsung_T5/vienn/work_sv/figures_sarur/'
+pdf(paste(path.satur, 'satur_100_cmp.pdf', sep = ''), width = 5.5, height = 4)
+print(g)     # Plot 1 --> in the first page of PDF
+dev.off()
+
+
+```
+
+
+
+## SNPs
+```{r}
+
+path.snps = '/Volumes/Samsung_T5/vienn/work_snps/'
+file.snps = 'snps_all.rds'
+snps = readRDS(paste(path.snps, file.snps, sep = ''))
+
+n.rep = 20  # number of repetitions
+
+
+sv.sat = snps
+sv.sat[is.na(sv.sat)] = -3
+
+
+df.sat = c()
+for(n.gen in 2:ncol(sv.sat)){  # number of genomes to consider
+  for(i.rep in 1:n.rep){
+    i.accs = sample(ncol(sv.sat), n.gen, replace = F)
+    sv.sat.rep = sv.sat[,i.accs]
+    y = sum((rowSums(sv.sat.rep == 0) != 0) & (rowSums(sv.sat.rep == 2) != 0))
+    if(x == 0) stop()
+    df.sat = rbind(df.sat, c(n.gen, y, i.rep))
+  }
+  print(df.sat)
+  # stop()
+}
+
+saveRDS(df.sat, '/Volumes/Samsung_T5/vienn/work_snps/snps_satur.rds', compress = F)
+
+df.sat.snp = data.frame(df.sat)
+colnames(df.sat.snp) = c('n.gen', 'n.sv', 'i.rep')
+
+
+g <- ggplot(df.sat.snp, aes(x=n.gen, y=n.sv)) + 
+  geom_point()+
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Number of SNPS')  
+  
+g
+
+
+```
+## SVs and SNPs
+```{r}
+
+df.sat.100$type = 'sv'
+df.sat.snp$type = 'snp'
+
+df.sat.cumm = rbind(df.sat.100[,colnames(df.sat.snp)], df.sat.snp)
+
+for(itype in unique(df.sat.cumm$type)){
+  df.sat.cumm[df.sat.cumm$type == itype,'n.sv'] = df.sat.cumm[df.sat.cumm$type== itype,'n.sv'] -
+    min(df.sat.cumm[df.sat.cumm$type== itype,'n.sv'])
+  df.sat.cumm[df.sat.cumm$type== itype,'n.sv'] = df.sat.cumm[df.sat.cumm$type== itype,'n.sv']/
+    max(df.sat.cumm[df.sat.cumm$type== itype,'n.sv'])
+}
+
+
+
+
+g <- ggplot(df.sat.cumm, aes(x=n.gen, y=n.sv, color = type)) + 
+  geom_point(alpha = 0.5)+geom_smooth(method = "loess", se = FALSE) +
+  # facet_grid(cols = vars(Var1)) + 
+  theme_minimal() + 
+  # facet_grid(rows = vars(type)) +
+  # scale_y_continuous(trans='log10') +
+  xlab('Number of genomes') + 
+  ylab('Normalised number') 
+  
+g
+
+```
+
+## Proportion of pricate SNPs / SVs
+```{r}
+
+sv.sat = sv.se.bin[sv.se$len >= min.len,-1]
+n.sv = c()
+for(icol in 1:ncol(sv.sat)){
+  idx0 = which(sv.sat[,icol] == 0)
+  # length(idx0)
+  n0 = sum(rowSums(sv.sat[idx0,-icol] == 0) == 0)
+  
+  idx0 = which(sv.sat[,icol] == 1)
+  # length(idx0)
+  # idx0 = idx0[rowSums(sv.sat[idx0,-icol] == 1) == 0]
+  n1 = sum(rowSums(sv.sat[idx0,-icol] == 1) == 0)
+  
+  # print(n0+n1)
+  n.sv = c(n.sv, n0+n1)
+}
+n.sv.big.norm = n.sv / nrow(sv.sat)
+
+
+sv.sat = sv.se.bin[(sv.se$len >= 15) & (sv.se$len < min.len),-1]
+n.sv = c()
+for(icol in 1:ncol(sv.sat)){
+  idx0 = which(sv.sat[,icol] == 0)
+  # length(idx0)
+  n0 = sum(rowSums(sv.sat[idx0,-icol] == 0) == 0)
+  
+  idx0 = which(sv.sat[,icol] == 1)
+  # length(idx0)
+  # idx0 = idx0[rowSums(sv.sat[idx0,-icol] == 1) == 0]
+  n1 = sum(rowSums(sv.sat[idx0,-icol] == 1) == 0)
+  
+  # print(n0+n1)
+  n.sv = c(n.sv, n0+n1)
+}
+n.sv.small.norm = n.sv / nrow(sv.sat)
+
+sv.sat = snps[,-1]
+sv.sat[is.na(sv.sat)] = -3
+
+n.snps = c()
+for(icol in 1:ncol(sv.sat)){
+  print(icol)
+  idx0 = which(sv.sat[,icol] == 0)
+  # length(idx0)
+  n0 = sum(rowSums(sv.sat[idx0,-icol] == 0) == 0)
+  
+  idx0 = which(sv.sat[,icol] == 2)
+  # idx0 = idx0[rowSums(sv.sat[idx0,-icol] == 1) == 0]
+  n1 = sum(rowSums(sv.sat[idx0,-icol] == 2) == 0)
+  
+  # print(n0+n1)
+  n.snps = c(n.snps, n0+n1)
+}
+
+
+n.snps.norm = n.snps/nrow(sv.sat)
+
+
+df.snps.norm = data.frame(p = n.snps.norm, type = 'SNPs')
+df.sv.small.norm = data.frame(p = n.sv.small.norm, type = 'SVs [15, 100)bp')
+df.sv.big.norm = data.frame(p = n.sv.big.norm, type = 'SVs, >= 100bp')
+
+df = rbind(rbind(df.sv.small.norm,df.sv.big.norm ), df.snps.norm)
+
+
+ggplot(df, aes(type, p)) +
+  geom_boxplot() +
+  # geom_jitter(width = 0.2, height = 0.2, alpha = 0.5)
+  theme_minimal()
+
+```
+
+## relation of private events
+```{r}
+plot(n.snps.norm, n.sv.big.norm)
+
+```
+
