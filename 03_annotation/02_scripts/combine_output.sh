@@ -80,6 +80,10 @@ cp ${path_base}/consensus/sv/sv_pangen_end.rds ${path_sv}
 
 # ------------------------------------------------------------------------
 # Archive
+echo "Archive..."
 folder_name=$(basename "${path_version}")
 tar -czf "${path_base}${folder_name}.tar.gz" -C "${path_version}" . > /dev/null 2>&1
+
+
+echo "Done!"
 
