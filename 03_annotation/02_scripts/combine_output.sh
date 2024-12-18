@@ -1,0 +1,44 @@
+path_base='../../../01_data/02_alignment/pannagram_v10_4/intermediate/'
+path_version="${path_base}version_2024_12_18/"
+
+mkdir -p ${path_version}
+
+# ------------------------------------------------------------------------
+# Copy alignments
+echo "Copy alignments..."
+
+path_aln="${path_version}aln/"
+cp ${path_base}/consensensus/estra2_* ${path_aln}
+
+# ------------------------------------------------------------------------
+# Copy gff annotations
+echo "Copy annotations..."
+
+path_gff="${path_version}aln/"
+cp ${path_base}/annotation/gff_pan_merged_renamed.gff ${path_gff}
+cp -r ${path_base}/annotation/own ${path_gff}
+
+# ------------------------------------------------------------------------
+# Copy gff features
+echo "Copy gff features..."
+
+path_features="${path_version}gff_features/"
+cp ${path_base}/annotation/features/* ${path_features}
+
+# ------------------------------------------------------------------------
+# Copy consensus sequences
+echo "Copy consensus sequences..."
+
+path_seq="${path_version}seq/"
+cp ${path_base}/consensensus/seq/*fasta ${path_seq}
+
+
+# ------------------------------------------------------------------------
+# Copy SVs
+echo "Copy SVs..."
+
+path_sv="${path_version}sv/"
+cp -r ${path_base}/consensensus/sv/gff ${path_sv}
+cp ${path_base}/consensensus/sv/seq_sv_big.fasta ${path_sv}
+cp ${path_base}/consensensus/sv/seq_sv_big.fasta ${path_sv}
+cp ${path_base}/consensensus/sv/sv_pangen_end.rds ${path_sv}
