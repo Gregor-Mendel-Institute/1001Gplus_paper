@@ -1,3 +1,28 @@
+# ----------------------------------------------------------------------------
+#            ERROR HANDLING BLOCK
+# ----------------------------------------------------------------------------
+
+# Exit immediately if any command returns a non-zero status
+set -e
+
+# Keep track of the last executed command
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+
+# Define a trap for the EXIT signal
+trap 'catch $?' EXIT
+
+# Function to handle the exit signal
+catch() {
+    # Check if the exit code is non-zero
+    if [ $1 -ne 0 ]; then
+        echo "\"${last_command}\" command failed with exit code $1."
+    fi
+}
+
+# ----------------------------------------------------------------------------
+#                   MAIN
+# ----------------------------------------------------------------------------
+
 path_base='../../../01_data/02_alignment/pannagram_v10_4/intermediate/'
 path_version="${path_base}version_2024_12_18/"
 
@@ -8,7 +33,7 @@ mkdir -p ${path_version}
 echo "Copy alignments..."
 
 path_aln="${path_version}aln/"
-cp ${path_base}/consensensus/estra2_* ${path_aln}
+cp ${path_base}/consensus/estra2_* ${path_aln}
 
 # ------------------------------------------------------------------------
 # Copy gff annotations
@@ -30,7 +55,7 @@ cp ${path_base}/annotation/features/* ${path_features}
 echo "Copy consensus sequences..."
 
 path_seq="${path_version}seq/"
-cp ${path_base}/consensensus/seq/*fasta ${path_seq}
+cp ${path_base}/consensus/seq/*fasta ${path_seq}
 
 
 # ------------------------------------------------------------------------
@@ -38,7 +63,7 @@ cp ${path_base}/consensensus/seq/*fasta ${path_seq}
 echo "Copy SVs..."
 
 path_sv="${path_version}sv/"
-cp -r ${path_base}/consensensus/sv/gff ${path_sv}
-cp ${path_base}/consensensus/sv/seq_sv_big.fasta ${path_sv}
-cp ${path_base}/consensensus/sv/seq_sv_big.fasta ${path_sv}
-cp ${path_base}/consensensus/sv/sv_pangen_end.rds ${path_sv}
+cp -r ${path_base}/consensus/sv/gff ${path_sv}
+cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
+cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
+cp ${path_base}/consensus/sv/sv_pangen_end.rds ${path_sv}
