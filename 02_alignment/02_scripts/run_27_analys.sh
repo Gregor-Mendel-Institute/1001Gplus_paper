@@ -41,4 +41,6 @@ source activate pannagram
 PATH_WORK="../../../"
 PATH_ALN="${PATH_WORK}01_data/02_alignment/"
 
-analys  -path_msa "${PATH_ALN}pannagram_v10_4/intermediate/consensus/"   -path_chr "${PATH_ALN}pannagram_v10_4/intermediate/chromosomes/"  -seq -sv -sv_graph -aln_type extra2_
+#analys  -path_msa "${PATH_ALN}pannagram_v10_4/intermediate/consensus/"   -path_chr "${PATH_ALN}pannagram_v10_4/intermediate/chromosomes/"  -aln_type extra2_ -seq -sv -sv_graph
+
+analys  -path_msa "${PATH_ALN}pannagram_v10_4/intermediate/consensus/"   -path_chr "${PATH_ALN}pannagram_v10_4/intermediate/chromosomes/"  -aln_type extra2_  -sv_sim "../../../01_data/09_tair10/tair10_tes.fasta"
