@@ -220,6 +220,8 @@ pokaz('* Merge annotation')
 # save(list = ls(), file = "tmp_workspace_annotation.RData")
 if(!file.exists(file.genes.only)){
   gff.pan.merged = mergeAnn(gff.new, gff.pan.all)
+  pokaz('nrow merged', nrow(gff.pan.merged))
+  pokaz('nrow components', nrow(gff.new), nrow(gff.pan.all))
 
   options(scipen = 999)
   cat("##gff-version 3\n", file = file.pan.merged)
