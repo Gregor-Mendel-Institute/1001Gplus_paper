@@ -20,7 +20,7 @@ conda activate pannagram
 PATH_ANN="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/fasta/"
 PATH_SIM="../../../01_data/02_alignment/pannagram_v10_4/intermediate/annotation/simsearch/"
 
-FILE_DB="/groups/nordborg/projects/the1001genomesplus/01_data/09_tair10/tair10_tes.fasta"
+FILE_DB="/groups/nordborg/projects/the1001genomesplus/01_data/09_tair10/new_te.fasta"
 
 
 makeblastdb -in ${FILE_DB} -dbtype nucl
