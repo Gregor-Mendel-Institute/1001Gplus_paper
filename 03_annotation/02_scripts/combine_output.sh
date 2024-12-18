@@ -75,8 +75,9 @@ mkdir -p ${path_sv}
 
 cp -r ${path_base}/consensus/sv/gff ${path_sv}
 cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
-cp ${path_base}/consensus/sv/sv_pangen_beg.fasta ${path_sv}
+cp ${path_base}/consensus/sv/sv_pangen_beg.rds ${path_sv}
 cp ${path_base}/consensus/sv/sv_pangen_end.rds ${path_sv}
+cp ${path_base}/consensus/sv/sv_pangen_pos.rds ${path_sv}
 
 # ------------------------------------------------------------------------
 # Archive
