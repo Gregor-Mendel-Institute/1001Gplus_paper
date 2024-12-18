@@ -33,6 +33,7 @@ mkdir -p ${path_version}
 echo "Copy alignments..."
 
 path_aln="${path_version}aln/"
+echo ${path_aln}
 mkdir -p ${path_aln}
 
 cp ${path_base}/consensus/extra2_* ${path_aln}
