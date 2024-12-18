@@ -40,3 +40,7 @@ Rename:
 Rscript fix_renamed_acc.R
 ```
 
+## Combine output in the version_XX archive
+```bash
+./combine_output.sh 
+```
