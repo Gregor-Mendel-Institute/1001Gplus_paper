@@ -33,13 +33,17 @@ mkdir -p ${path_version}
 echo "Copy alignments..."
 
 path_aln="${path_version}aln/"
+mkdir -p ${path_aln}
+
 cp ${path_base}/consensus/extra2_* ${path_aln}
 
 # ------------------------------------------------------------------------
 # Copy gff annotations
 echo "Copy annotations..."
 
-path_gff="${path_version}aln/"
+path_gff="${path_version}gff/"
+mkdir -p ${path_gff}
+
 cp ${path_base}/annotation/gff_pan_merged_renamed.gff ${path_gff}
 cp -r ${path_base}/annotation/own ${path_gff}
 
@@ -48,6 +52,8 @@ cp -r ${path_base}/annotation/own ${path_gff}
 echo "Copy gff features..."
 
 path_features="${path_version}gff_features/"
+mkdir -p ${path_features}
+
 cp ${path_base}/annotation/features/* ${path_features}
 
 # ------------------------------------------------------------------------
@@ -55,6 +61,8 @@ cp ${path_base}/annotation/features/* ${path_features}
 echo "Copy consensus sequences..."
 
 path_seq="${path_version}seq/"
+mkdir -p ${path_seq}
+
 cp ${path_base}/consensus/seq/*fasta ${path_seq}
 
 
@@ -63,6 +71,8 @@ cp ${path_base}/consensus/seq/*fasta ${path_seq}
 echo "Copy SVs..."
 
 path_sv="${path_version}sv/"
+mkdir -p ${path_sv}
+
 cp -r ${path_base}/consensus/sv/gff ${path_sv}
 cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
 cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
