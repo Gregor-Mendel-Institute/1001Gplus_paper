@@ -33,7 +33,6 @@ mkdir -p ${path_version}
 echo "Copy alignments..."
 
 path_aln="${path_version}aln/"
-echo ${path_aln}
 mkdir -p ${path_aln}
 
 cp ${path_base}/consensus/extra2_* ${path_aln}
@@ -78,3 +77,9 @@ cp -r ${path_base}/consensus/sv/gff ${path_sv}
 cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
 cp ${path_base}/consensus/sv/seq_sv_big.fasta ${path_sv}
 cp ${path_base}/consensus/sv/sv_pangen_end.rds ${path_sv}
+
+# ------------------------------------------------------------------------
+# Archive
+folder_name=$(basename "${path_version}")
+tar -czf "${path_base}${folder_name}.tar.gz" -C "${path_version}" . > /dev/null 2>&1
+
