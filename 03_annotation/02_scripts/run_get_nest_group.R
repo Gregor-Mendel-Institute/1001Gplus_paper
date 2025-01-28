@@ -40,48 +40,6 @@ if (!dir.exists(path.features)) dir.create(path.features)
 
 
 # ***********************************************************************
-# ---- mRNA and Gene frequencies ----
-pokaz('* mRNA and Gene frequencies')
-
-cl <- makeCluster(30)
-registerDoParallel(cl)
-
-df <- foreach(acc = accessions.true, .combine = rbind, .packages = c('pannagram', 'crayon', 'rhdf5', 'utils')) %dopar% {
-  file.own.merged <- paste0(path.ann.own, 'gff_', acc, '.gff')
-  
-  gff.all <- read.table(file.own.merged, stringsAsFactors = FALSE)
-  gff.all <- gff.all[gff.all$V3 %in% c('gene', 'mRNA'), ]
-  gff.all$gr <- sapply(gff.all$V9, function(s) strsplit(s, '\\.')[[1]][1])
-  gff.all$gr <- sapply(gff.all$gr, function(s) strsplit(s, ';')[[1]][1])
-  gff.all$gr <- gsub('ID=', '', gff.all$gr)
-  
-  df.acc = data.frame(acc = acc, gr = gff.all$gr, type = gff.all$V3)
-  return(df.acc)
-}
-
-stopCluster(cl)
-
-cnt.genes = table(df$gr[df$type == 'gene'], df$acc[df$type == 'gene'])
-cnt.mrnas = table(df$gr[df$type == 'mRNA'], df$acc[df$type == 'mRNA'])
-
-# save(list = ls(), file = "tmp_workspace_counts.RData")
-
-write.table(cnt.genes, paste0(path.features, 'counts_gene.txt'), sep = '\t', quote = F)
-write.table(cnt.mrnas, paste0(path.features, 'counts_mrna.txt'), sep = '\t', quote = F)
-
-tot.genes = rowSums(cnt.genes)
-tot.mrnas = rowSums(cnt.mrnas)
-
-gr.unique = unique(c(names(tot.genes), names(tot.mrnas)))
-
-df.tot = data.frame(matrix(0, nrow = length(gr.unique), ncol = 2, dimnames = list(gr.unique, c('gene', 'mrna'))))
-df.tot[names(tot.genes),'gene'] = tot.genes
-df.tot[names(tot.mrnas),'mrna'] = tot.mrnas
-
-write.table(df.tot, paste0(path.features, 'counts_total.txt'), sep = '\t', quote = F)
-
-# ***********************************************************************
-
 # ---- mRNA on mRNA ----
 pokaz('* mRNA on mRNA')
 
